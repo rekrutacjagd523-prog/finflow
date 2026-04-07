@@ -1,16 +1,11 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { signInWithEmailAndPassword, setPersistence, inMemoryPersistence } from 'firebase/auth'
 import { auth } from '@/lib/firebase/firebase'
 
-// Dev-only page for Playwright tests: /test-login?email=x&password=y
-// Uses server-side /api/test/auth to get orgId (bypasses IndexedDB issues),
-// and also signs in client-side Firebase so useAuth/useOrg hooks work.
-export default function TestLoginPage() {
+function TestLoginContent() {
   const params = useSearchParams()
   const router = useRouter()
   const [status, setStatus] = useState('Initializing...')
@@ -67,5 +62,13 @@ export default function TestLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#0f0f0f]">
       <p className="text-white text-sm font-mono" data-testid="status">{status}</p>
     </div>
+  )
+}
+
+export default function TestLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#0f0f0f]"><p className="text-white text-sm font-mono">Loading...</p></div>}>
+      <TestLoginContent />
+    </Suspense>
   )
 }
