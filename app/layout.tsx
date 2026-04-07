@@ -11,8 +11,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Finmap — Financial Manager',
-  description: 'Track income, expenses, and cash flow for your business.',
+  title: 'FinFlow — Business Finance Manager',
+  description: 'Track income, expenses, and cash flow for your business. 14-day free trial.',
 }
 
 export default function RootLayout({

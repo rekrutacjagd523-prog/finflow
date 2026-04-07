@@ -10,7 +10,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts'
 import { MonthlyData } from '@/lib/utils/analytics'
 
@@ -26,11 +25,12 @@ function formatNumber(n: number): string {
   }).format(n)
 }
 
-function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
 
-  const income = payload.find(p => p.dataKey === 'income')?.value ?? 0
-  const expense = payload.find(p => p.dataKey === 'expense')?.value ?? 0
+  const income = (payload.find((p: any) => p.dataKey === 'income')?.value as number) ?? 0
+  const expense = (payload.find((p: any) => p.dataKey === 'expense')?.value as number) ?? 0
   const net = (income as number) - (expense as number)
 
   return (
@@ -40,12 +40,12 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
           <span className="text-[#6b7280]">Дохід:</span>
-          <span className="ml-auto font-medium text-[#22c55e]">+{formatNumber(income as number)}</span>
+          <span className="ml-auto font-medium text-[#22c55e]">+{formatNumber(income)}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
           <span className="text-[#6b7280]">Витрата:</span>
-          <span className="ml-auto font-medium text-[#ef4444]">−{formatNumber(expense as number)}</span>
+          <span className="ml-auto font-medium text-[#ef4444]">−{formatNumber(expense)}</span>
         </div>
         <div className="border-t border-[#e5e7eb] pt-1 mt-1 flex items-center gap-2">
           <span className="text-[#6b7280]">Різниця:</span>
@@ -94,7 +94,7 @@ export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
           tickLine={false}
         />
         <YAxis
-          tick={{ fontSize: 12, fill: '#6b7280', fontVariant: 'tabular-nums' } as React.SVGProps<SVGTextElement>}
+          tick={{ fontSize: 12, fill: '#6b7280' }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => formatNumber(v)}

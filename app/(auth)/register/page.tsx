@@ -84,7 +84,7 @@ export default function RegisterPage() {
             <div className="w-8 h-8 rounded-[8px] bg-[#00c896] flex items-center justify-center">
               <span className="text-white font-semibold text-sm">F</span>
             </div>
-            <span className="text-[#111111] font-semibold text-lg">Finmap</span>
+            <span className="text-[#111111] font-semibold text-lg">FinFlow</span>
           </div>
           <CardTitle className="text-[#111111] text-xl font-semibold">
             Start free trial

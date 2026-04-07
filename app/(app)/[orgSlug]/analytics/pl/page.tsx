@@ -30,7 +30,8 @@ export default function PLPage() {
   const orgSlug = params.orgSlug as string
   const { orgId } = useOrg()
   const { transactions, loading: txLoading } = useTransactions(orgId)
-  const { categories, loading: catLoading } = useCategories(orgId)
+  const { incomeCategories, expenseCategories, loading: catLoading } = useCategories(orgId)
+  const categories = [...incomeCategories, ...expenseCategories]
   const [period, setPeriod] = useState(6)
 
   const loading = txLoading || catLoading

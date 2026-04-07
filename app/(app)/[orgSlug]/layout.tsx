@@ -54,7 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="w-7 h-7 rounded-[6px] bg-[#00c896] flex items-center justify-center">
               <span className="text-white font-semibold text-xs">F</span>
             </div>
-            <span className="text-white font-semibold text-sm">Finmap</span>
+            <span className="text-white font-semibold text-sm">FinFlow</span>
           </div>
           {org && (
             <p className="text-white/40 text-xs mt-2 truncate">{org.name}</p>
