@@ -6,11 +6,13 @@ export async function createJwt(): Promise<string> {
   let PRIVATE_KEY_PEM: string
 
   try {
-    const { env } = await getCloudflareContext({ async: true })
+    // In Cloudflare Workers runtime, secrets/vars are in env, not process.env
+    const { env } = getCloudflareContext()
     APP_ID = (env as Record<string, string>).ENABLEBANKING_APP_ID ?? process.env.ENABLEBANKING_APP_ID!
     const raw = (env as Record<string, string>).ENABLEBANKING_PRIVATE_KEY ?? process.env.ENABLEBANKING_PRIVATE_KEY!
     PRIVATE_KEY_PEM = raw.replace(/\\n/g, '\n')
   } catch {
+    // Fallback for local next dev (outside Cloudflare Workers context)
     APP_ID = process.env.ENABLEBANKING_APP_ID!
     PRIVATE_KEY_PEM = process.env.ENABLEBANKING_PRIVATE_KEY!.replace(/\\n/g, '\n')
   }
