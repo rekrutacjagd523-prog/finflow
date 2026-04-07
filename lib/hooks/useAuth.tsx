@@ -38,9 +38,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let hadUser = false
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser)
       setLoading(false)
+      if (firebaseUser) {
+        hadUser = true
+        document.cookie = '__session=1; path=/; max-age=86400; SameSite=Lax'
+      } else if (hadUser) {
+        // Only clear cookie on explicit sign-out (not on initial unauthenticated load)
+        document.cookie = '__session=; path=/; max-age=0'
+      }
     })
     return unsubscribe
   }, [])

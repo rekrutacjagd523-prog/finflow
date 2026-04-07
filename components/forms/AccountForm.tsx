@@ -11,13 +11,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { createAccount, updateAccount } from '@/lib/firebase/accounts'
 import type { Account } from '@/types'
 
@@ -111,18 +104,15 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
 
           <div className="space-y-1">
             <Label>Тип</Label>
-            <Select value={type} onValueChange={(v) => setType(v as Account['type'])}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ACCOUNT_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as Account['type'])}
+              className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
+            >
+              {ACCOUNT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -141,18 +131,15 @@ export function AccountForm({ orgId, account, open, onClose }: AccountFormProps)
             </div>
             <div className="space-y-1">
               <Label>Валюта</Label>
-              <Select value={currency} onValueChange={(v) => setCurrency(v ?? 'UAH')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CURRENCIES.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
           </div>
 

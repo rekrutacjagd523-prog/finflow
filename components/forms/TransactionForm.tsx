@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+// Note: account/category selects use native <select> for reliable display
 import { Badge } from '@/components/ui/badge'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { createTransaction, updateTransaction } from '@/lib/firebase/transactions'
@@ -69,7 +70,15 @@ export function TransactionForm({
   const categories = type === 'income' ? incomeCategories : expenseCategories
   const amountRef = useRef<HTMLInputElement>(null)
 
-  // Reset when type changes
+  // Reset form when opened with new defaultType
+  useEffect(() => {
+    if (open && !isEdit) {
+      setType(defaultType)
+      setCategoryId('')
+    }
+  }, [open, defaultType, isEdit])
+
+  // Reset category when type changes
   useEffect(() => {
     setCategoryId('')
   }, [type])
@@ -93,20 +102,22 @@ export function TransactionForm({
     return Object.keys(errs).length === 0
   }
 
-  const buildData = (): Omit<Transaction, 'id' | 'orgId'> => ({
-    type,
-    accountId,
-    amount: parseFloat(amount),
-    currency,
-    categoryId: categoryId || undefined,
-    counterpartyId: type === 'transfer' ? toAccountId : undefined,
-    date: new Date(date),
-    description: description.trim() || undefined,
-    isRecurring,
-    projectId: undefined,
-    tags: [],
-    fileUrls: [],
-  })
+  const buildData = (): Omit<Transaction, 'id' | 'orgId'> => {
+    const data: Omit<Transaction, 'id' | 'orgId'> = {
+      type,
+      accountId,
+      amount: parseFloat(amount),
+      currency,
+      date: new Date(date),
+      isRecurring,
+      tags: [],
+      fileUrls: [],
+    }
+    if (categoryId) data.categoryId = categoryId
+    if (type === 'transfer' && toAccountId) data.counterpartyId = toAccountId
+    if (description.trim()) data.description = description.trim()
+    return data
+  }
 
   const handleSubmit = async (addAnother = false) => {
     if (!validate()) return
@@ -169,24 +180,16 @@ export function TransactionForm({
                 {/* Account */}
                 <div className="space-y-1">
                   <Label>Рахунок{t === 'transfer' ? ' (звідки)' : ''}</Label>
-                  <Select value={accountId} onValueChange={(v) => setAccountId(v ?? '')}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Оберіть рахунок" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          <span className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-full"
-                              style={{ backgroundColor: a.color }}
-                            />
-                            {a.name}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <select
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                    className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
+                  >
+                    <option value="">Оберіть рахунок</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
                   {errors.accountId && <p className="text-xs text-red-500">{errors.accountId}</p>}
                 </div>
 
@@ -194,26 +197,16 @@ export function TransactionForm({
                 {t === 'transfer' && (
                   <div className="space-y-1">
                     <Label>Рахунок (куди)</Label>
-                    <Select value={toAccountId} onValueChange={(v) => setToAccountId(v ?? '')}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Оберіть рахунок" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts
-                          .filter((a) => a.id !== accountId)
-                          .map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              <span className="flex items-center gap-2">
-                                <span
-                                  className="w-2 h-2 rounded-full"
-                                  style={{ backgroundColor: a.color }}
-                                />
-                                {a.name}
-                              </span>
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <select
+                      value={toAccountId}
+                      onChange={(e) => setToAccountId(e.target.value)}
+                      className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
+                    >
+                      <option value="">Оберіть рахунок</option>
+                      {accounts.filter((a) => a.id !== accountId).map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
                     {errors.toAccountId && (
                       <p className="text-xs text-red-500">{errors.toAccountId}</p>
                     )}
@@ -258,18 +251,16 @@ export function TransactionForm({
                 {t !== 'transfer' && (
                   <div className="space-y-1">
                     <Label>Категорія</Label>
-                    <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? '')}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Без категорії" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <select
+                      value={categoryId}
+                      onChange={(e) => setCategoryId(e.target.value)}
+                      className="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus:border-[#00c896]"
+                    >
+                      <option value="">Без категорії</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
 

@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useOrg } from '@/lib/hooks/useOrg'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import CalendarView from '@/components/charts/CalendarView'
 import { ArrowLeft } from 'lucide-react'
@@ -11,7 +10,7 @@ import { ArrowLeft } from 'lucide-react'
 export default function CalendarPage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
-  const { orgId } = useOrg()
+  const orgId = orgSlug
   const { transactions, loading } = useTransactions(orgId)
 
   const today = new Date()

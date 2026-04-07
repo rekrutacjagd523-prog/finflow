@@ -3,12 +3,12 @@
 import { useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useOrg } from '@/lib/hooks/useOrg'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import { useCategories } from '@/lib/hooks/useCategories'
 import { buildPL } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
 import PLTable from '@/components/charts/PLTable'
+import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
 import { Download, ArrowLeft } from 'lucide-react'
 
 const PERIODS = [
@@ -28,7 +28,7 @@ function getMonthKeys(months: number): string[] {
 export default function PLPage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
-  const { orgId } = useOrg()
+  const orgId = orgSlug
   const { transactions, loading: txLoading } = useTransactions(orgId)
   const { incomeCategories, expenseCategories, loading: catLoading } = useCategories(orgId)
   const categories = [...incomeCategories, ...expenseCategories]
@@ -96,6 +96,9 @@ export default function PLPage() {
             </button>
           ))}
         </div>
+
+        {/* Summary + pie charts */}
+        {!loading && rows.length > 0 && <PLSummaryCharts rows={rows} />}
 
         {/* Table */}
         <PLTable rows={rows} monthKeys={monthKeys} loading={loading} />

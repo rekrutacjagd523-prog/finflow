@@ -37,7 +37,6 @@ export async function seedDefaultCategories(orgId: string): Promise<void> {
 
   const all = [
     ...DEFAULT_INCOME_CATEGORIES.map((c) => ({ ...c, type: 'income' as const })),
-    ...DEFAULT_EXPENSE_CATEGORIES.map((c) => ({ ...c, type: 'expense' as const })),
   ]
 
   await Promise.all(

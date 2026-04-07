@@ -1,0 +1,672 @@
+{
+  "name": "Content Factory — Notion Edition",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": null,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": { "parameters": { "hook": { "label": "Content Factory Webhook" } } },
+        "parameters": [
+          {
+            "name": "hook",
+            "type": "hook:gateway-webhook",
+            "label": "Webhook",
+            "required": true
+          }
+        ],
+        "note": "Webhook принимает параметры: ?page_id=XXX&button=start|trans|gpt|lab|gen"
+      }
+    },
+    {
+      "id": 2,
+      "module": "gateway:WebhookRespond",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "status": "200",
+        "body": "<script>window.close();</script>",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "text/html"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "notion:RetrievePage",
+      "version": 1,
+      "parameters": {
+        "__IMTCONN__": null
+      },
+      "mapper": {
+        "pageId": "{{1.page_id}}"
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 },
+        "parameters": [
+          {
+            "name": "__IMTCONN__",
+            "type": "account:notion",
+            "label": "Notion Connection",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": 100,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {
+        "maxResults": 1
+      },
+      "mapper": null,
+      "metadata": {
+        "designer": { "x": 900, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 10,
+              "module": "apify:RunActor",
+              "version": 2,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "actorId": "",
+                "input": "{\"usernames\": [\"{{3.properties.`Ник Инстаграма`.rich_text[].plain_text}}\"], \"resultsLimit\": {{3.properties.`Количество`.number}}}",
+                "build": "latest",
+                "memory": 4096,
+                "timeout": 300,
+                "synchronous": true
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": -600 },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:apify",
+                    "label": "Apify Connection",
+                    "required": true
+                  }
+                ]
+              },
+              "filter": {
+                "name": "Route: Анализ (Start)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.button}}",
+                      "b": "start",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": 11,
+              "module": "apify:GetDatasetItems",
+              "version": 2,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "datasetId": "{{10.defaultDatasetId}}",
+                "clean": true,
+                "limit": ""
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": -600 }
+              }
+            },
+            {
+              "id": 12,
+              "module": "notion:CreateDatabaseItem",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "databaseId": "",
+                "properties": {
+                  "Ник Инстаграма": {
+                    "type": "rich_text",
+                    "rich_text": [{ "text": { "content": "{{11.ownerUsername}}" } }]
+                  },
+                  "Ссылка на видео": {
+                    "type": "url",
+                    "url": "{{11.url}}"
+                  },
+                  "Preview": {
+                    "type": "url",
+                    "url": "{{11.displayUrl}}"
+                  },
+                  "Медиа": {
+                    "type": "url",
+                    "url": "{{11.videoUrl}}"
+                  },
+                  "Просмотры": {
+                    "type": "number",
+                    "number": "{{11.videoViewCount}}"
+                  },
+                  "Лайки": {
+                    "type": "number",
+                    "number": "{{11.likesCount}}"
+                  },
+                  "Описание видео": {
+                    "type": "rich_text",
+                    "rich_text": [{ "text": { "content": "{{11.caption}}" } }]
+                  },
+                  "Комментарии": {
+                    "type": "number",
+                    "number": "{{11.commentsCount}}"
+                  },
+                  "Когда добавлено": {
+                    "type": "date",
+                    "date": { "start": "{{11.timestamp}}" }
+                  }
+                }
+              },
+              "metadata": {
+                "designer": { "x": 1800, "y": -600 }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 20,
+              "module": "http:ActionGetFile",
+              "version": 3,
+              "parameters": {},
+              "mapper": {
+                "url": "{{3.properties.`Медиа`.url}}",
+                "shareCookies": false
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": -300 }
+              },
+              "filter": {
+                "name": "Route: Транскрибация (Trans)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.button}}",
+                      "b": "trans",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": 21,
+              "module": "assemblyai:UploadFile",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "data": "{{20.data}}",
+                "fileName": "{{20.fileName}}"
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": -300 },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:assemblyai",
+                    "label": "AssemblyAI Connection",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 22,
+              "module": "assemblyai:TranscribeAudio",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "audio_url": "{{21.upload_url}}",
+                "language_detection": true,
+                "punctuate": true,
+                "format_text": true
+              },
+              "metadata": {
+                "designer": { "x": 1800, "y": -300 }
+              }
+            },
+            {
+              "id": 23,
+              "module": "notion:UpdatePage",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "pageId": "{{1.page_id}}",
+                "properties": {
+                  "Транскриптер": {
+                    "type": "rich_text",
+                    "rich_text": [{ "text": { "content": "{{22.text}}" } }]
+                  }
+                }
+              },
+              "metadata": {
+                "designer": { "x": 2100, "y": -300 }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 30,
+              "module": "util:SetVariables",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "variables": [
+                  {
+                    "name": "assistant_id",
+                    "value": "{{switch(3.properties.`Выбор`.select.name; \"Перевод\"; \"asst_YOUR_TRANSLATE_ID\"; \"10 заголовков\"; \"asst_YOUR_HEADLINES_ID\"; \"Больше материала\"; \"asst_YOUR_MORE_MATERIAL_ID\"; \"asst_YOUR_DEFAULT_ID\")}}"
+                  }
+                ],
+                "scope": "roundtrip"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": 0 }
+              },
+              "filter": {
+                "name": "Route: ChatGPT (GPT)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.button}}",
+                      "b": "gpt",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": 31,
+              "module": "openai-gpt-4:MessageAnAssistant",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "assistantId": "{{30.assistant_id}}",
+                "role": "user",
+                "message": "{{3.properties.`Транскриптер`.rich_text[].plain_text}}"
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": 0 },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:openai-gpt-4",
+                    "label": "OpenAI Connection",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 32,
+              "module": "notion:UpdatePage",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "pageId": "{{1.page_id}}",
+                "properties": {
+                  "Результат ГПТ": {
+                    "type": "rich_text",
+                    "rich_text": [{ "text": { "content": "{{31.message}}" } }]
+                  }
+                }
+              },
+              "metadata": {
+                "designer": { "x": 1800, "y": 0 }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 40,
+              "module": "notion:RetrievePage",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "pageId": "{{1.page_id}}"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": 300 }
+              },
+              "filter": {
+                "name": "Route: Озвучка 11Labs (Lab)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.button}}",
+                      "b": "lab",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": 41,
+              "module": "elevenlabs:TextToSpeech",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "voiceId": "",
+                "modelId": "eleven_multilingual_v2",
+                "text": "{{40.properties.`Готовый результат`.rich_text[].plain_text}}",
+                "stability": 1,
+                "similarity_boost": 1
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": 300 },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:elevenlabs",
+                    "label": "11 Labs Connection",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 42,
+              "module": "google-drive:UploadFile",
+              "version": 2,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "folderId": "",
+                "name": "voiceover_{{now}}.mp3",
+                "data": "{{41.data}}",
+                "convert": false
+              },
+              "metadata": {
+                "designer": { "x": 1800, "y": 300 },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:google",
+                    "label": "Google Drive Connection",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 43,
+              "module": "google-drive:ShareFile",
+              "version": 2,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "fileId": "{{42.id}}",
+                "type": "anyone",
+                "role": "reader"
+              },
+              "metadata": {
+                "designer": { "x": 2100, "y": 300 }
+              }
+            },
+            {
+              "id": 44,
+              "module": "notion:UpdatePage",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "pageId": "{{1.page_id}}",
+                "properties": {
+                  "Озвучка": {
+                    "type": "url",
+                    "url": "{{43.webContentLink}}"
+                  }
+                }
+              },
+              "metadata": {
+                "designer": { "x": 2400, "y": 300 }
+              }
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 50,
+              "module": "notion:RetrievePage",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "pageId": "{{1.page_id}}"
+              },
+              "metadata": {
+                "designer": { "x": 1200, "y": 600 }
+              },
+              "filter": {
+                "name": "Route: HeyGen Аватар (Gen)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{1.button}}",
+                      "b": "gen",
+                      "o": "text:equal"
+                    }
+                  ]
+                ]
+              }
+            },
+            {
+              "id": 51,
+              "module": "heygen:CreateAvatarVideo",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "avatar_id": "",
+                "voice_type": "audio",
+                "audio_url": "{{50.properties.`Озвучка`.url}}",
+                "caption": false,
+                "scale": 1
+              },
+              "metadata": {
+                "designer": { "x": 1500, "y": 600 },
+                "parameters": [
+                  {
+                    "name": "__IMTCONN__",
+                    "type": "account:heygen",
+                    "label": "HeyGen Connection",
+                    "required": true
+                  }
+                ]
+              }
+            },
+            {
+              "id": 52,
+              "module": "builtin:BasicFeeder",
+              "version": 1,
+              "parameters": {
+                "delay": 300
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 1800, "y": 600 },
+                "note": "Sleep 300 секунд — ожидание генерации аватара"
+              }
+            },
+            {
+              "id": 53,
+              "module": "heygen:GetVideo",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "video_id": "{{51.video_id}}"
+              },
+              "metadata": {
+                "designer": { "x": 2100, "y": 600 }
+              }
+            },
+            {
+              "id": 54,
+              "module": "notion:UpdatePage",
+              "version": 1,
+              "parameters": {
+                "__IMTCONN__": null
+              },
+              "mapper": {
+                "pageId": "{{1.page_id}}",
+                "properties": {
+                  "HeyGen результат": {
+                    "type": "url",
+                    "url": "{{53.video_url}}"
+                  }
+                }
+              },
+              "metadata": {
+                "designer": { "x": 2400, "y": 600 }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "eu2.make.com",
+    "notes": [
+      "=== CONTENT FACTORY — NOTION EDITION ===",
+      "",
+      "СТРУКТУРА:",
+      "Webhook → Webhook Response → Notion Retrieve Page → Router (5 маршрутов)",
+      "",
+      "МАРШРУТЫ:",
+      "1. START  — Apify (Instagram Reel Scraper) → Notion Create Database Item",
+      "2. TRANS  — HTTP Get File → AssemblyAI Upload + Transcribe → Notion Update Page",
+      "3. GPT    — Set Variables (выбор ассистента) → OpenAI Assistant → Notion Update Page",
+      "4. LAB    — 11 Labs TTS → Google Drive Upload + Share → Notion Update Page",
+      "5. GEN    — HeyGen Create Avatar → Sleep 300s → HeyGen Get Video → Notion Update Page",
+      "",
+      "=== НАСТРОЙКА NOTION ===",
+      "",
+      "1. Создать Database в Notion со свойствами (properties):",
+      "",
+      "   | Свойство           | Тип в Notion     |",
+      "   |--------------------|------------------|",
+      "   | Name               | Title            |",
+      "   | Ник Инстаграма     | Text             |",
+      "   | Количество         | Number           |",
+      "   | Ссылка на видео    | URL              |",
+      "   | Preview            | URL              |",
+      "   | Медиа              | URL              |",
+      "   | Просмотры          | Number           |",
+      "   | Лайки              | Number           |",
+      "   | Описание видео     | Text             |",
+      "   | Комментарии        | Number           |",
+      "   | Когда добавлено    | Date             |",
+      "   | Сколько дней назад | Formula          |",
+      "   | В работу           | Select           |",
+      "   | Транскриптер       | Text             |",
+      "   | Выбор              | Select           |",
+      "   | Результат ГПТ      | Text             |",
+      "   | Готовый результат   | Text             |",
+      "   | Озвучка            | URL              |",
+      "   | HeyGen результат   | URL              |",
+      "",
+      "2. КНОПКИ В NOTION:",
+      "   Создать 5 Button properties, каждая с действием 'Open URL':",
+      "",
+      "   Запуск:        https://hook.make.com/YOUR_WEBHOOK_ID?page_id={{page_id}}&button=start",
+      "   Транскрибация: https://hook.make.com/YOUR_WEBHOOK_ID?page_id={{page_id}}&button=trans",
+      "   ChatGPT:       https://hook.make.com/YOUR_WEBHOOK_ID?page_id={{page_id}}&button=gpt",
+      "   11 Labs:       https://hook.make.com/YOUR_WEBHOOK_ID?page_id={{page_id}}&button=lab",
+      "   HeyGen:        https://hook.make.com/YOUR_WEBHOOK_ID?page_id={{page_id}}&button=gen",
+      "",
+      "   Notion Button → Open URL автоматически подставит page_id текущей строки.",
+      "   Если Notion не поддерживает динамический page_id в кнопке,",
+      "   используйте альтернативу: кнопка меняет Select-свойство 'Trigger'",
+      "   → Notion Automation отслеживает изменение → отправляет webhook.",
+      "",
+      "3. ФОРМУЛА 'Сколько дней назад':",
+      "   dateBetween(now(), prop(\"Когда добавлено\"), \"days\")",
+      "",
+      "4. СОРТИРОВКА:",
+      "   Создать View с сортировкой по 'Просмотры' (Descending)",
+      "   и группировкой по 'Ник Инстаграма'",
+      "",
+      "=== НАСТРОЙКА MAKE.COM ===",
+      "",
+      "1. Создать Webhook → скопировать URL в кнопки Notion",
+      "2. Подключить: Notion, Apify, AssemblyAI, OpenAI, 11 Labs, Google Drive, HeyGen",
+      "3. В Notion модулях указать Database ID",
+      "4. В Apify указать Actor ID (Instagram Reel Scraper)",
+      "5. Заменить asst_YOUR_*_ID на реальные ID ассистентов OpenAI",
+      "6. Выбрать Voice ID (11 Labs), Avatar ID (HeyGen), Folder ID (Google Drive)",
+      "",
+      "=== ОТЛИЧИЯ ОТ AIRTABLE ВЕРСИИ ===",
+      "",
+      "- Airtable Attachment → Notion URL (Notion API не поддерживает upload файлов напрямую)",
+      "- Файлы (preview, видео, озвучка) хранятся как URL-ссылки",
+      "- record_id → page_id",
+      "- Кнопки через 'Open URL' вместо Airtable Button с формулой"
+    ]
+  }
+}

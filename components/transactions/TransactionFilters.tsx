@@ -4,13 +4,6 @@ import { useState } from 'react'
 import { Search, X, SlidersHorizontal } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import type { Account, Category } from '@/types'
 import type { TransactionFilters } from '@/lib/firebase/transactions'
 
@@ -67,45 +60,28 @@ export function TransactionFiltersBar({
         </div>
 
         {/* Account filter */}
-        <Select
+        <select
           value={filters.accountId ?? '_all'}
-          onValueChange={(v) => onChange({ ...filters, accountId: !v || v === '_all' ? undefined : v })}
+          onChange={(e) => onChange({ ...filters, accountId: e.target.value === '_all' ? undefined : e.target.value })}
+          className="h-8 rounded-lg border border-input bg-white px-2.5 text-sm outline-none focus:border-[#00c896] min-w-[140px]"
         >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Всі рахунки" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Всі рахунки</SelectItem>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: a.color }} />
-                  {a.name}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="_all">Всі рахунки</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>{a.name}</option>
+          ))}
+        </select>
 
         {/* Category filter */}
-        <Select
+        <select
           value={filters.categoryId ?? '_all'}
-          onValueChange={(v) =>
-            onChange({ ...filters, categoryId: !v || v === '_all' ? undefined : v })
-          }
+          onChange={(e) => onChange({ ...filters, categoryId: e.target.value === '_all' ? undefined : e.target.value })}
+          className="h-8 rounded-lg border border-input bg-white px-2.5 text-sm outline-none focus:border-[#00c896] min-w-[140px]"
         >
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Всі категорії" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Всі категорії</SelectItem>
-            {allCategories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="_all">Всі категорії</option>
+          {allCategories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
 
         {/* More filters toggle */}
         <Button

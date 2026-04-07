@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Plus, Minus, ArrowLeftRight } from 'lucide-react'
+import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { AccountCard } from '@/components/accounts/AccountCard'
 import { AccountForm } from '@/components/forms/AccountForm'
@@ -14,15 +15,9 @@ import { useCategories } from '@/lib/hooks/useCategories'
 import type { TransactionFilters } from '@/lib/firebase/transactions'
 import type { Transaction } from '@/types'
 
-interface PageProps {
-  params: { orgSlug: string }
-}
-
-// For dev/demo — replace with real orgId resolution from orgSlug
-const DEMO_ORG_ID = 'demo-org'
-
-export default function TransactionsPage({ params }: PageProps) {
-  const orgId = DEMO_ORG_ID // TODO: resolve from orgSlug via Firestore
+export default function TransactionsPage() {
+  const params = useParams()
+  const orgId = params.orgSlug as string
 
   const { accounts, loading: accLoading } = useAccounts(orgId)
   const { incomeCategories, expenseCategories } = useCategories(orgId)

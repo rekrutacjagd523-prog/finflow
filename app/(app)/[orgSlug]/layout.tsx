@@ -50,12 +50,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="w-[220px] flex-shrink-0 bg-[#111111] flex flex-col border-r border-white/5">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-white/5">
-          <div className="flex items-center gap-2">
+          <Link href={`/${orgSlug}/transactions`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-7 h-7 rounded-[6px] bg-[#00c896] flex items-center justify-center">
               <span className="text-white font-semibold text-xs">F</span>
             </div>
             <span className="text-white font-semibold text-sm">FinFlow</span>
-          </div>
+          </Link>
           {org && (
             <p className="text-white/40 text-xs mt-2 truncate">{org.name}</p>
           )}

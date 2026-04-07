@@ -14,7 +14,8 @@ const PERIODS = ['Поточний місяць', 'Квартал', 'Рік']
 export default function BalancePage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
-  const { orgId, org } = useOrg()
+  const orgId = orgSlug
+  const { org } = useOrg()
   const { accounts, loading } = useAccounts(orgId)
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0])
 

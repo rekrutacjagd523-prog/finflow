@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useOrg } from '@/lib/hooks/useOrg'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import { buildCashFlow, MonthlyData } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
@@ -23,7 +22,7 @@ function formatNum(n: number): string {
 export default function CashFlowPage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
-  const { orgId } = useOrg()
+  const orgId = orgSlug
   const { transactions, loading } = useTransactions(orgId)
   const [period, setPeriod] = useState(12)
 
@@ -86,6 +85,29 @@ export default function CashFlowPage() {
             </button>
           ))}
         </div>
+
+        {/* Summary cards */}
+        {!loading && data.length > 0 && (() => {
+          const totalIncome = data.reduce((s, d) => s + d.income, 0)
+          const totalExpense = data.reduce((s, d) => s + d.expense, 0)
+          const net = totalIncome - totalExpense
+          return (
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: 'Доходи', value: totalIncome, color: '#22c55e', bg: '#f0fdf4' },
+                { label: 'Витрати', value: totalExpense, color: '#ef4444', bg: '#fef2f2' },
+                { label: 'Різниця', value: net, color: net >= 0 ? '#22c55e' : '#ef4444', bg: net >= 0 ? '#f0fdf4' : '#fef2f2' },
+              ].map((card) => (
+                <div key={card.label} className="bg-white rounded-2xl border border-[#e5e7eb] px-5 py-4">
+                  <p className="text-xs text-[#6b7280] mb-1">{card.label}</p>
+                  <p className="text-xl font-bold tabular-nums" style={{ color: card.color }}>
+                    {card.value >= 0 && card.label === 'Різниця' ? '+' : ''}{formatNum(card.value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* Chart */}
         <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6">
