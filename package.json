@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:cf": "npx @opennextjs/cloudflare build && node -e \"const fs=require('fs');fs.readdirSync('.open-next',{withFileTypes:true}).filter(d=>d.name!=='assets'&&d.name!=='worker.js').forEach(d=>fs.cpSync('.open-next/'+d.name,'.open-next/assets/'+d.name,{recursive:true}));fs.copyFileSync('.open-next/worker.js','.open-next/assets/_worker.js');\"",
+    "build:cf": "npx @opennextjs/cloudflare build && node -e \"const fs=require('fs');fs.readdirSync('.open-next',{withFileTypes:true}).filter(d=>d.name!=='assets'&&d.name!=='worker.js').forEach(d=>fs.cpSync('.open-next/'+d.name,'.open-next/assets/'+d.name,{recursive:true}));fs.copyFileSync('.open-next/worker.js','.open-next/assets/_worker.js');['.open-next/assets/middleware/handler.mjs','.open-next/assets/server-functions/default/handler.mjs'].forEach(f=>{try{let c=fs.readFileSync(f,'utf-8');c=c.replace(/Function\\(\\\"return this\\\"\\)\\(\\)/g,'globalThis');fs.writeFileSync(f,c);console.log('Patched '+f)}catch(e){}});\"",
     "start": "next start",
     "lint": "eslint"
   },
