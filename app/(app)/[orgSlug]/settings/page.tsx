@@ -13,7 +13,6 @@ import { useOrg } from '@/lib/hooks/useOrg'
 import { useCategories } from '@/lib/hooks/useCategories'
 import { createCategory } from '@/lib/firebase/categories'
 import { db } from '@/lib/firebase/firebase'
-import MonobankConnect from '@/components/settings/MonobankConnect'
 import EnableBankingConnect from '@/components/settings/EnableBankingConnect'
 import type { Category } from '@/types'
 
@@ -226,23 +225,12 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Monobank connection */}
+      {/* Enable Banking (European banks) */}
       <Card className="bg-white rounded-[12px] border border-[#e5e7eb] shadow-none">
         <CardHeader className="pb-4">
-          <CardTitle className="text-[#111111] text-base font-semibold">Monobank</CardTitle>
-          <CardDescription className="text-[#6b7280] text-sm">Автоматичний імпорт транзакцій через токен</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MonobankConnect orgId={orgId} />
-        </CardContent>
-      </Card>
-
-      {/* TrueLayer (European banks) */}
-      <Card className="bg-white rounded-[12px] border border-[#e5e7eb] shadow-none">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-[#111111] text-base font-semibold">Банки Європи</CardTitle>
+          <CardTitle className="text-[#111111] text-base font-semibold">Підключення банку</CardTitle>
           <CardDescription className="text-[#6b7280] text-sm">
-            Santander, PKO, mBank, ING та інші через TrueLayer Open Banking
+            Santander, PKO, mBank, ING та інші через Enable Banking Open Banking
           </CardDescription>
         </CardHeader>
         <CardContent>
