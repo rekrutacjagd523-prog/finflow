@@ -109,7 +109,7 @@ export default function EnableBankingConnect({ orgId }: Props) {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      sessionStorage.setItem('eb_pending', JSON.stringify({ name: inst.name, sessionId: data.sessionId }))
+      sessionStorage.setItem('eb_pending', JSON.stringify({ name: inst.name, authorizationId: data.authorizationId }))
       window.location.href = data.url
     } catch (e) {
       toast.error('Помилка: ' + (e instanceof Error ? e.message : String(e)))

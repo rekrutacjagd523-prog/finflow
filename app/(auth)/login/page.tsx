@@ -26,6 +26,7 @@ export default function LoginPage() {
     try {
       const user = await signIn(email, password)
       const orgs = await getUserOrganizations(user.uid)
+      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Lax'
       if (orgs.length > 0) {
         router.push(`/${orgs[0].id}/transactions`)
       } else {
@@ -44,6 +45,7 @@ export default function LoginPage() {
     try {
       const { user } = await signInGoogle()
       const orgs = await getUserOrganizations(user.uid)
+      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Lax'
       if (orgs.length > 0) {
         router.push(`/${orgs[0].id}/transactions`)
       } else {

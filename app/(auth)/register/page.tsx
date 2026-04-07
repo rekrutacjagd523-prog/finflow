@@ -42,6 +42,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { orgId } = await signUp(email, password, name, orgName, currency)
+      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Lax'
       router.push(`/${orgId}/transactions`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed'
@@ -60,6 +61,7 @@ export default function RegisterPage() {
     try {
       const { user } = await signInGoogle()
       const existingOrgs = await getUserOrganizations(user.uid)
+      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Lax'
       if (existingOrgs.length > 0) {
         router.push(`/${existingOrgs[0].id}/transactions`)
         return
