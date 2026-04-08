@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { ArrowRight, Check, BarChart2, Calendar, ArrowLeftRight, Shield, Zap, Users } from 'lucide-react'
+import { LandingNavLogin, LandingHeroLogin } from '@/components/landing/LandingAuthButtons'
 
 export default function HomePage() {
   return (
@@ -20,9 +21,7 @@ export default function HomePage() {
             <Link href="/pricing" className="hover:text-[#111111] transition-colors">Ціни</Link>
           </nav>
           <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden sm:block text-sm text-[#6b7280] hover:text-[#111111] transition-colors">
-              Увійти
-            </Link>
+            <LandingNavLogin />
             <Link href="/register" className="inline-flex items-center gap-1.5 bg-[#00c896] hover:bg-[#00b384] text-white rounded-lg text-sm font-medium h-8 px-4 transition-colors">
               Спробувати безкоштовно
             </Link>
@@ -52,9 +51,7 @@ export default function HomePage() {
                 Почати безкоштовно
                 <ArrowRight className="w-4 h-4" />
               </Link>
-              <Link href="/login" className="inline-flex items-center justify-center gap-2 border border-[#e5e7eb] hover:border-[#d1d5db] bg-white text-[#111111] rounded-xl font-medium h-12 px-8 text-base transition-colors">
-                Увійти в акаунт
-              </Link>
+              <LandingHeroLogin />
             </div>
             <p className="text-xs text-[#9ca3af] mt-4">Приєднались 2 400+ компаній з України та Польщі</p>
           </div>
