@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Building2, RefreshCw, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import {
+  getBankConnections,
+  saveBankConnection,
+  deleteBankConnection,
+  type BankConnection,
+} from '@/lib/firebase/bankConnections'
 
 interface Institution {
   id: string
@@ -14,23 +20,8 @@ interface Institution {
   logo: string | null
 }
 
-interface EbConnection {
-  sessionId: string
-  institutionName: string
-  connectedAt: string
-}
-
 interface Props {
   orgId: string
-}
-
-const STORAGE_KEY = (orgId: string) => `eb_connections_${orgId}`
-
-function loadConnections(orgId: string): EbConnection[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY(orgId)) ?? '[]') } catch { return [] }
-}
-function saveConnections(orgId: string, conns: EbConnection[]) {
-  localStorage.setItem(STORAGE_KEY(orgId), JSON.stringify(conns))
 }
 
 const COUNTRIES = [
@@ -45,7 +36,7 @@ const COUNTRIES = [
 
 export default function EnableBankingConnect({ orgId }: Props) {
   const searchParams = useSearchParams()
-  const [connections, setConnections] = useState<EbConnection[]>([])
+  const [connections, setConnections] = useState<BankConnection[]>([])
   const [institutions, setInstitutions] = useState<Institution[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [country, setCountry] = useState('PL')
@@ -53,9 +44,13 @@ export default function EnableBankingConnect({ orgId }: Props) {
   const [loading, setLoading] = useState(false)
   const [connecting, setConnecting] = useState(false)
 
-  useEffect(() => { setConnections(loadConnections(orgId)) }, [orgId])
+  // Subscribe to Firestore bank connections
+  useEffect(() => {
+    const unsub = getBankConnections(orgId, setConnections)
+    return unsub
+  }, [orgId])
 
-  // Handle callback
+  // Handle callback from Enable Banking OAuth
   useEffect(() => {
     const payload = searchParams.get('eb_auth')
     if (!payload) return
@@ -63,16 +58,15 @@ export default function EnableBankingConnect({ orgId }: Props) {
       const { sessionId } = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
       if (!sessionId) return
       const pending = JSON.parse(sessionStorage.getItem('eb_pending') ?? '{}')
-      const newConn: EbConnection = {
+      const newConn: Omit<BankConnection, 'id'> = {
         sessionId,
         institutionName: pending.name ?? 'Банк',
         connectedAt: new Date().toISOString(),
       }
-      const updated = [...loadConnections(orgId).filter(c => c.sessionId !== sessionId), newConn]
-      saveConnections(orgId, updated)
-      setConnections(updated)
-      sessionStorage.removeItem('eb_pending')
-      toast.success(`${newConn.institutionName} підключено`)
+      saveBankConnection(orgId, newConn).then(() => {
+        sessionStorage.removeItem('eb_pending')
+        toast.success(`${newConn.institutionName} підключено`)
+      }).catch(() => toast.error('Помилка збереження підключення'))
       const url = new URL(window.location.href)
       url.searchParams.delete('eb_auth')
       window.history.replaceState({}, '', url.toString())
@@ -117,11 +111,13 @@ export default function EnableBankingConnect({ orgId }: Props) {
     }
   }
 
-  const handleDisconnect = (sessionId: string) => {
-    const updated = connections.filter(c => c.sessionId !== sessionId)
-    saveConnections(orgId, updated)
-    setConnections(updated)
-    toast.success('Банк відключено')
+  const handleDisconnect = async (sessionId: string) => {
+    try {
+      await deleteBankConnection(orgId, sessionId)
+      toast.success('Банк відключено')
+    } catch {
+      toast.error('Помилка відключення банку')
+    }
   }
 
   const filtered = institutions.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
