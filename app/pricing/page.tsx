@@ -1,165 +1,165 @@
-import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import type { Metadata } from "next";
+import Link from 'next/link'
+import { ArrowRight, Check } from 'lucide-react'
+import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "Ціни — FinFlow",
-  description:
-    "Один план для всього. $29/місяць або $24/місяць при річній оплаті. 14 днів безкоштовно — без кредитної картки.",
-};
+  title: 'Ціни — FinFlow',
+  description: 'Один план для всього. $29/місяць або $24/місяць при річній оплаті. 14 днів безкоштовно — без кредитної картки.',
+}
+
+const features = [
+  'Необмежена кількість транзакцій',
+  'До 10 банківських рахунків',
+  'Cash Flow і P&L звіти',
+  'До 5 учасників команди',
+  'Автоматична категоризація',
+  'Імпорт CSV з банку',
+  'Доступ з мобільного',
+  'Підтримка протягом 24 годин',
+]
+
+const faq = [
+  {
+    q: 'Що відбувається після 14 днів?',
+    a: 'Ви отримаєте нагадування за 3 дні. Якщо не підписались — доступ переходить в режим читання. Дані не видаляються.',
+  },
+  {
+    q: 'Чи можна скасувати підписку?',
+    a: 'Так, в будь-який момент з налаштувань. Доступ зберігається до кінця оплаченого місяця.',
+  },
+  {
+    q: 'Скільки компаній можна вести?',
+    a: 'Один акаунт — одна організація. Для кількох компаній — окремі акаунти.',
+  },
+]
 
 export default function PricingPage() {
-  const features = [
-    "Необмежена кількість транзакцій",
-    "До 10 банківських рахунків",
-    "Cash Flow і P&L звіти",
-    "До 5 учасників команди",
-    "Автоматична категоризація",
-    "Імпорт CSV з банку",
-    "Доступ з мобільного",
-    "Підтримка протягом 24 годин",
-  ];
-
   return (
-    <div className="flex flex-col min-h-screen bg-white text-[#111111]">
+    <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-[#f0f0f0]">
+
       {/* Nav */}
-      <header className="border-b border-[#e5e7eb] sticky top-0 bg-white/95 backdrop-blur z-50">
+      <header className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-50">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="font-semibold text-lg tracking-tight">
-            FinFlow
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#00c896] flex items-center justify-center">
+              <span className="text-black font-black text-sm leading-none">F</span>
+            </div>
+            <span className="font-display font-bold text-[15px] tracking-tight text-white">FinFlow</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-[#6b7280]">
-            <Link href="/#features" className="hover:text-[#111111] transition-colors">
-              Можливості
-            </Link>
-            <Link href="/pricing" className="text-[#111111] font-medium">
-              Ціни
-            </Link>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-white/45">
+            <Link href="/#features" className="hover:text-white transition-colors duration-200">Можливості</Link>
+            <Link href="/pricing" className="text-white font-medium">Ціни</Link>
           </nav>
-          <Link
-            href="#"
-            className="text-sm text-[#6b7280] hover:text-[#111111] transition-colors"
-          >
+          <Link href="/login" className="text-sm text-white/45 hover:text-white transition-colors duration-200">
             Увійти
           </Link>
         </div>
       </header>
 
       <main className="flex-1">
+
         {/* Header */}
-        <section className="pt-20 pb-16 px-6 text-center">
+        <section className="pt-24 pb-16 px-6 text-center">
           <div className="max-w-xl mx-auto">
-            <h1 className="text-4xl font-semibold mb-4 text-[#111111]">
-              Один план. Все включено.
+            <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-5">Тарифи</p>
+            <h1 className="font-display text-[3rem] md:text-[3.5rem] font-black text-white tracking-[-0.04em] leading-[1.02] mb-5">
+              Один план.<br />Все включено.
             </h1>
-            <p className="text-lg text-[#6b7280]">
-              Жодних рівнів, жодних прихованих обмежень. Один прозорий тариф
-              для команд до 50 осіб.
+            <p className="text-lg text-white/40 leading-relaxed">
+              Жодних рівнів, жодних прихованих обмежень.<br />
+              Один прозорий тариф для команд до 50 осіб.
             </p>
           </div>
         </section>
 
         {/* Pricing card */}
-        <section className="pb-24 px-6">
-          <div className="max-w-md mx-auto">
-            <div className="rounded-2xl border-2 border-[#00c896] bg-white p-8 shadow-lg">
-              <div className="flex items-center justify-between mb-6">
+        <section className="pb-28 px-6">
+          <div className="max-w-[460px] mx-auto">
+            <div
+              className="rounded-2xl border border-[#00c896]/22 bg-[#0d0d0d] p-9"
+              style={{ boxShadow: '0 0 80px hsla(161,100%,39%,0.06)' }}
+            >
+              <div className="flex items-start justify-between mb-7">
                 <div>
-                  <p className="text-sm font-medium text-[#6b7280] uppercase tracking-wide mb-1">
-                    Pro
-                  </p>
-                  <div className="flex items-end gap-2">
-                    <span className="text-4xl font-semibold text-[#111111]">
-                      $29
-                    </span>
-                    <span className="text-[#6b7280] mb-1">/місяць</span>
+                  <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.2em] mb-4">Pro</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-[3.75rem] font-black text-white tracking-tight leading-none">$29</span>
+                    <span className="text-white/35 text-lg">/місяць</span>
                   </div>
-                  <p className="text-sm text-[#00c896] font-medium mt-1">
+                  <p className="text-sm text-[#00c896]/70 font-medium mt-2">
                     або $24/міс при річній оплаті — економія $60/рік
                   </p>
                 </div>
-                <Badge className="bg-[#f0fdf4] text-[#16a34a] border-[#bbf7d0] hover:bg-[#f0fdf4] self-start">
+                <span className="mt-1 text-[10px] font-bold text-[#00c896] border border-[#00c896]/25 bg-[#00c896]/[0.08] px-2.5 py-1 rounded-full uppercase tracking-wider">
                   Популярний
-                </Badge>
+                </span>
               </div>
 
-              <ul className="space-y-3 mb-8">
-                {features.map((feature, i) => (
-                  <li key={i} className="flex items-center gap-3">
+              <ul className="space-y-3.5 mb-9">
+                {features.map((feature) => (
+                  <li key={feature} className="flex items-center gap-3">
                     <Check className="w-4 h-4 text-[#00c896] shrink-0" />
-                    <span className="text-sm text-[#374151]">{feature}</span>
+                    <span className="text-sm text-white/60">{feature}</span>
                   </li>
                 ))}
               </ul>
 
-              <Button
-                size="lg"
-                className="w-full bg-[#00c896] hover:bg-[#00b384] text-white rounded-lg font-medium text-base"
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center gap-2 w-full bg-[#00c896] hover:bg-[#00daa6] text-black font-bold rounded-xl h-12 text-base transition-all duration-200"
+                style={{ boxShadow: '0 0 40px hsla(161,100%,39%,0.2)' }}
               >
                 Почати 14-денний trial
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-
-              <p className="text-center text-sm text-[#9ca3af] mt-3">
-                Кредитна картка не потрібна для trial
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <p className="text-center text-xs text-white/22 mt-3">
+                Кредитна картка не потрібна
               </p>
             </div>
 
-            {/* Annual toggle note */}
-            <div className="mt-6 p-4 bg-[#f9fafb] rounded-xl border border-[#e5e7eb]">
-              <p className="text-sm text-[#6b7280] text-center">
+            {/* Annual note */}
+            <div className="mt-4 p-4 rounded-xl border border-white/[0.07] bg-[#0d0d0d]">
+              <p className="text-sm text-white/35 text-center">
                 Річна оплата:&nbsp;
-                <span className="font-semibold text-[#111111]">$288/рік</span>
+                <span className="font-semibold text-white/60">$288/рік</span>
                 &nbsp;замість $348 — платіть менше за лояльність.
               </p>
             </div>
           </div>
         </section>
 
-        {/* FAQ mini */}
-        <section className="py-16 px-6 bg-[#f9fafb] border-t border-[#e5e7eb]">
+        {/* FAQ */}
+        <section className="py-24 px-6 border-t border-white/[0.06]">
           <div className="max-w-2xl mx-auto">
-            <h2 className="text-2xl font-semibold text-[#111111] mb-8 text-center">
+            <h2 className="font-display text-[2rem] font-black text-white tracking-[-0.03em] mb-12 text-center">
               Часті питання
             </h2>
-            <div className="space-y-6">
-              {[
-                {
-                  q: "Що відбувається після 14 днів?",
-                  a: "Ви отримаєте нагадування за 3 дні. Якщо не підписались — доступ переходить в режим читання. Дані не видаляються.",
-                },
-                {
-                  q: "Чи можна скасувати підписку?",
-                  a: "Так, в будь-який момент з налаштувань. Доступ зберігається до кінця оплаченого місяця.",
-                },
-                {
-                  q: "Скільки компаній можна вести?",
-                  a: "Один акаунт — одна організація. Для кількох компаній — окремі акаунти.",
-                },
-              ].map((item, i) => (
-                <div key={i} className="border-b border-[#e5e7eb] pb-6 last:border-0">
-                  <p className="font-medium text-[#111111] mb-2">{item.q}</p>
-                  <p className="text-[#6b7280] text-sm leading-relaxed">
-                    {item.a}
-                  </p>
+            <div className="space-y-0">
+              {faq.map((item, i) => (
+                <div key={i} className="py-6 border-b border-white/[0.06] last:border-0">
+                  <p className="font-semibold text-white/80 mb-2.5">{item.q}</p>
+                  <p className="text-white/40 text-sm leading-relaxed">{item.a}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
+
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[#e5e7eb] py-8 px-6">
+      <footer className="border-t border-white/[0.06] py-10 px-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <Link href="/" className="font-semibold text-[#111111]">
-            FinFlow
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-[#00c896] flex items-center justify-center">
+              <span className="text-black font-black text-xs">F</span>
+            </div>
+            <span className="font-display font-bold text-white/50 text-sm">FinFlow</span>
           </Link>
-          <p className="text-sm text-[#9ca3af]">© 2026 FinFlow</p>
+          <p className="text-sm text-white/18">© 2026 FinFlow</p>
         </div>
       </footer>
+
     </div>
-  );
+  )
 }

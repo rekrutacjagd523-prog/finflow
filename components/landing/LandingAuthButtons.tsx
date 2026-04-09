@@ -4,18 +4,21 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useOrg } from '@/lib/hooks/useOrg'
 
+const secondaryClass =
+  'inline-flex items-center justify-center gap-2 border border-white/[0.12] hover:border-white/[0.22] bg-white/[0.04] hover:bg-white/[0.07] text-white/75 hover:text-white rounded-xl font-semibold h-12 px-8 text-[0.9375rem] transition-all duration-200'
+
 export function LandingNavLogin() {
   const { user, loading } = useAuth()
   const { orgId } = useOrg()
 
-  if (loading) return <span className="hidden sm:block text-sm text-[#d1d5db] cursor-wait">Увійти</span>
+  if (loading) return <span className="hidden sm:block text-sm text-white/20 cursor-wait">Увійти</span>
   if (user && orgId) return (
-    <Link href={`/${orgId}/transactions`} className="hidden sm:block text-sm text-[#6b7280] hover:text-[#111111] transition-colors">
+    <Link href={`/${orgId}/transactions`} className="hidden sm:block text-sm text-white/45 hover:text-white transition-colors duration-200">
       Перейти в акаунт
     </Link>
   )
   return (
-    <Link href="/login" className="hidden sm:block text-sm text-[#6b7280] hover:text-[#111111] transition-colors">
+    <Link href="/login" className="hidden sm:block text-sm text-white/45 hover:text-white transition-colors duration-200">
       Увійти
     </Link>
   )
@@ -26,17 +29,17 @@ export function LandingHeroLogin() {
   const { orgId } = useOrg()
 
   if (loading) return (
-    <span className="inline-flex items-center justify-center gap-2 border border-[#e5e7eb] bg-white text-[#9ca3af] rounded-xl font-medium h-12 px-8 text-base cursor-wait">
+    <span className={`${secondaryClass} opacity-40 cursor-wait`}>
       Увійти в акаунт
     </span>
   )
   if (user && orgId) return (
-    <Link href={`/${orgId}/transactions`} className="inline-flex items-center justify-center gap-2 border border-[#e5e7eb] hover:border-[#d1d5db] bg-white text-[#111111] rounded-xl font-medium h-12 px-8 text-base transition-colors">
+    <Link href={`/${orgId}/transactions`} className={secondaryClass}>
       Перейти в акаунт
     </Link>
   )
   return (
-    <Link href="/login" className="inline-flex items-center justify-center gap-2 border border-[#e5e7eb] hover:border-[#d1d5db] bg-white text-[#111111] rounded-xl font-medium h-12 px-8 text-base transition-colors">
+    <Link href="/login" className={secondaryClass}>
       Увійти в акаунт
     </Link>
   )

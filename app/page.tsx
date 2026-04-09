@@ -4,26 +4,29 @@ import { LandingNavLogin, LandingHeroLogin } from '@/components/landing/LandingA
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen bg-white text-[#111111]">
+    <div className="flex flex-col min-h-screen bg-[#0a0a0a] text-[#f0f0f0]">
 
       {/* ── NAV ── */}
-      <header className="border-b border-[#e5e7eb] sticky top-0 bg-white/95 backdrop-blur z-50">
+      <header className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0a]/90 backdrop-blur-md z-50">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-[6px] bg-[#00c896] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">F</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-[#00c896] flex items-center justify-center">
+              <span className="text-black font-black text-sm leading-none">F</span>
             </div>
-            <span className="font-semibold text-lg">FinFlow</span>
+            <span className="font-display font-bold text-[15px] tracking-tight text-white">FinFlow</span>
           </div>
-          <nav className="hidden md:flex items-center gap-7 text-sm text-[#6b7280]">
-            <Link href="#features" className="hover:text-[#111111] transition-colors">Можливості</Link>
-            <Link href="#industries" className="hover:text-[#111111] transition-colors">Для кого</Link>
-            <Link href="/pricing" className="hover:text-[#111111] transition-colors">Ціни</Link>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-white/45">
+            <Link href="#features" className="hover:text-white transition-colors duration-200">Можливості</Link>
+            <Link href="#industries" className="hover:text-white transition-colors duration-200">Для кого</Link>
+            <Link href="/pricing" className="hover:text-white transition-colors duration-200">Ціни</Link>
           </nav>
           <div className="flex items-center gap-3">
             <LandingNavLogin />
-            <Link href="/register" className="inline-flex items-center gap-1.5 bg-[#00c896] hover:bg-[#00b384] text-white rounded-lg text-sm font-medium h-8 px-4 transition-colors">
-              Спробувати безкоштовно
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-1.5 bg-[#00c896] hover:bg-[#00daa6] text-black font-semibold rounded-lg text-sm h-8 px-4 transition-colors duration-200"
+            >
+              Спробувати
             </Link>
           </div>
         </div>
@@ -32,107 +35,143 @@ export default function HomePage() {
       <main>
 
         {/* ── HERO ── */}
-        <section className="bg-gradient-to-b from-[#f8fffe] to-white pt-20 pb-16 px-6">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-[#f0fdf9] border border-[#a7f3d0] text-[#065f46] text-xs font-medium px-3 py-1 rounded-full mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00c896]" />
-              14 днів безкоштовно — без кредитної картки
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight tracking-tight mb-5">
-              Позбавтесь рутини<br />
-              <span className="text-[#00c896]">у фінансовому обліку</span>
-            </h1>
-            <p className="text-lg text-[#6b7280] leading-relaxed mb-8 max-w-2xl mx-auto">
-              FinFlow автоматизує рух грошей, звіти P&L і Cash Flow для компаній 2–50 осіб.
-              Замість Excel — один зрозумілий інструмент.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/register" className="inline-flex items-center justify-center gap-2 bg-[#00c896] hover:bg-[#00b384] text-white rounded-xl font-semibold h-12 px-8 text-base transition-colors shadow-sm shadow-[#00c89640]">
-                Почати безкоштовно
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <LandingHeroLogin />
-            </div>
-            <p className="text-xs text-[#9ca3af] mt-4">Приєднались 2 400+ компаній з України та Польщі</p>
-          </div>
+        <section className="grain relative overflow-hidden min-h-[90vh] flex items-center bg-[#0a0a0a]">
+          {/* Radial glow */}
+          <div
+            className="absolute top-[-10%] left-[30%] w-[700px] h-[700px] rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, hsla(161,100%,39%,0.07) 0%, transparent 65%)' }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full pointer-events-none"
+            style={{ background: 'radial-gradient(circle, hsla(161,100%,39%,0.04) 0%, transparent 70%)' }}
+          />
 
-          {/* App preview */}
-          <div className="max-w-4xl mx-auto mt-14 rounded-2xl border border-[#e5e7eb] shadow-xl overflow-hidden bg-[#f9fafb]">
-            <div className="flex items-center gap-1.5 px-4 py-2.5 bg-white border-b border-[#e5e7eb]">
-              <span className="w-3 h-3 rounded-full bg-[#fca5a5]" />
-              <span className="w-3 h-3 rounded-full bg-[#fde68a]" />
-              <span className="w-3 h-3 rounded-full bg-[#a7f3d0]" />
-              <span className="text-xs text-[#9ca3af] ml-2">finflow.app/transactions</span>
+          <div className="max-w-6xl mx-auto px-6 w-full py-20 grid md:grid-cols-[1fr_420px] gap-12 lg:gap-20 items-center">
+
+            {/* Left copy */}
+            <div>
+              <div className="animate-fade-up-1 inline-flex items-center gap-2 border border-[#00c896]/20 bg-[#00c896]/[0.06] text-[#00c896] text-xs font-semibold px-3 py-1.5 rounded-full mb-8 tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00c896]" style={{ animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
+                14 днів безкоштовно — без картки
+              </div>
+              <h1 className="animate-fade-up-2 font-display text-[3.25rem] md:text-[4rem] lg:text-[4.5rem] font-black leading-[1.02] tracking-[-0.04em] mb-6 text-white">
+                Фінанси<br />
+                бізнесу<br />
+                <span className="text-[#00c896]">без Excel</span>
+              </h1>
+              <p className="animate-fade-up-3 text-[1.0625rem] text-white/50 leading-relaxed mb-10 max-w-[420px]">
+                Cash Flow, P&amp;L і рух грошей для команд 2–50 осіб.
+                Один зрозумілий інструмент замість таблиць.
+              </p>
+              <div className="animate-fade-up-4 flex flex-col sm:flex-row gap-3">
+                <Link
+                  href="/register"
+                  className="inline-flex items-center justify-center gap-2 bg-[#00c896] hover:bg-[#00daa6] text-black font-bold rounded-xl h-12 px-8 text-[0.9375rem] transition-all duration-200"
+                  style={{ boxShadow: '0 0 40px hsla(161,100%,39%,0.25)' }}
+                >
+                  Почати безкоштовно
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <LandingHeroLogin />
+              </div>
+              <p className="animate-fade-up-5 text-xs text-white/25 mt-5">Приєднались 2 400+ компаній з України та Польщі</p>
             </div>
-            <div className="p-6 grid grid-cols-3 gap-3">
-              {[
-                { label: 'Баланс', value: '₴248 350', color: '#00c896', sub: 'на рахунках' },
-                { label: 'Дохід (місяць)', value: '+₴85 000', color: '#22c55e', sub: 'квітень 2026' },
-                { label: 'Витрати (місяць)', value: '−₴52 400', color: '#ef4444', sub: 'квітень 2026' },
-              ].map((card) => (
-                <div key={card.label} className="bg-white rounded-xl border border-[#e5e7eb] p-4">
-                  <p className="text-xs text-[#6b7280] mb-1">{card.label}</p>
-                  <p className="text-xl font-bold tabular-nums" style={{ color: card.color }}>{card.value}</p>
-                  <p className="text-xs text-[#9ca3af] mt-0.5">{card.sub}</p>
+
+            {/* Right: Dashboard preview */}
+            <div className="animate-fade-up-3 relative hidden md:block">
+              <div
+                className="rounded-2xl border border-white/[0.08] bg-[#0f0f0f] overflow-hidden"
+                style={{ boxShadow: '0 0 80px hsla(161,100%,39%,0.06), 0 32px 64px rgba(0,0,0,0.5)' }}
+              >
+                {/* Window bar */}
+                <div className="flex items-center gap-1.5 px-4 py-3 border-b border-white/[0.06] bg-[#0c0c0c]">
+                  <span className="w-2.5 h-2.5 rounded-full bg-white/[0.08]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-white/[0.08]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-white/[0.08]" />
+                  <span className="text-[10px] text-white/20 ml-2 font-mono tracking-wider">finflow.app</span>
                 </div>
-              ))}
-            </div>
-            <div className="px-6 pb-6 space-y-2">
-              {[
-                { name: 'Оплата від клієнта «Альфа»', cat: 'Продажі', acc: 'Monobank', amount: '+₴45 000', color: '#22c55e' },
-                { name: 'Оренда офісу', cat: 'Операційні', acc: 'PrivatBank', amount: '−₴12 000', color: '#ef4444' },
-                { name: 'Зарплата команди', cat: 'Зарплата', acc: 'Monobank', amount: '−₴85 000', color: '#ef4444' },
-              ].map((tx, i) => (
-                <div key={i} className="bg-white rounded-xl border border-[#e5e7eb] px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-[#111111]">{tx.name}</p>
-                    <p className="text-xs text-[#9ca3af]">{tx.cat} · {tx.acc}</p>
-                  </div>
-                  <p className="text-sm font-semibold tabular-nums" style={{ color: tx.color }}>{tx.amount}</p>
+
+                {/* Stats */}
+                <div className="p-4 grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Баланс', value: '₴248 350', color: '#00c896' },
+                    { label: 'Дохід', value: '+₴85 000', color: '#4ade80' },
+                    { label: 'Витрати', value: '−₴52 400', color: '#f87171' },
+                  ].map((card) => (
+                    <div key={card.label} className="bg-[#141414] rounded-xl border border-white/[0.06] p-3">
+                      <p className="text-[10px] text-white/30 mb-1.5 tracking-wide">{card.label}</p>
+                      <p className="font-display text-sm font-bold tabular-nums" style={{ color: card.color }}>{card.value}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+
+                {/* Transactions */}
+                <div className="px-4 pb-4 space-y-1.5">
+                  {[
+                    { name: 'Клієнт «Альфа» — оплата', cat: 'Продажі', amount: '+₴45 000', color: '#4ade80' },
+                    { name: 'Оренда офісу', cat: 'Операційні', amount: '−₴12 000', color: '#f87171' },
+                    { name: 'Зарплата команди', cat: 'Зарплата', amount: '−₴85 000', color: '#f87171' },
+                  ].map((tx, i) => (
+                    <div key={i} className="bg-[#141414] rounded-xl border border-white/[0.06] px-3 py-2.5 flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-medium text-white/70">{tx.name}</p>
+                        <p className="text-[10px] text-white/25 mt-0.5">{tx.cat}</p>
+                      </div>
+                      <p className="font-display text-[11px] font-bold tabular-nums" style={{ color: tx.color }}>{tx.amount}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Decorative ring */}
+              <div
+                className="absolute -bottom-6 -right-6 w-28 h-28 rounded-full border border-[#00c896]/10"
+                style={{ background: 'radial-gradient(circle, hsla(161,100%,39%,0.04) 0%, transparent 60%)' }}
+              />
             </div>
           </div>
         </section>
 
         {/* ── STATS ── */}
-        <section className="border-y border-[#e5e7eb] py-10 px-6">
-          <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+        <section className="border-y border-white/[0.06] py-12 px-6">
+          <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: '2 400+', label: 'компаній довіряють' },
-              { value: '94%', label: 'рекомендують друзям' },
+              { value: '2 400+', label: 'компаній' },
+              { value: '94%', label: 'рекомендують' },
               { value: '14 днів', label: 'безкоштовно' },
-              { value: '4 хв', label: 'середній час на налаштування' },
+              { value: '4 хв', label: 'налаштування' },
             ].map((s) => (
               <div key={s.label}>
-                <p className="text-3xl font-bold text-[#111111]">{s.value}</p>
-                <p className="text-sm text-[#6b7280] mt-1">{s.label}</p>
+                <p className="font-display text-3xl font-black text-white tracking-tight tabular-nums">{s.value}</p>
+                <p className="text-sm text-white/35 mt-1.5">{s.label}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* ── FOR WHOM (industries) ── */}
-        <section id="industries" className="py-20 px-6">
+        {/* ── FOR WHOM ── */}
+        <section id="industries" className="py-24 px-6">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <p className="text-xs font-semibold text-[#00c896] uppercase tracking-widest mb-3">Для кого</p>
-              <h2 className="text-3xl font-bold">Оберіть свою нішу</h2>
-              <p className="text-[#6b7280] mt-3 max-w-xl mx-auto">FinFlow підходить для різних типів бізнесу — від агенцій до рітейлу</p>
+            <div className="mb-14">
+              <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-4">Для кого</p>
+              <h2 className="font-display text-[2.5rem] font-black text-white tracking-[-0.03em] leading-tight">Оберіть свою нішу</h2>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { icon: '🏢', title: 'IT та агенції', desc: 'Облік проектів, зарплат підрядників, клієнтських платежів' },
-                { icon: '🛒', title: 'Торгівля', desc: 'Закупки, продажі, залишки, маржинальність по товарах' },
-                { icon: '🏗️', title: 'Будівництво', desc: 'Кошториси, витрати по об\'єктах, авансові платежі' },
-                { icon: '💆', title: 'Послуги', desc: 'Підписки, регулярні доходи, облік клієнтів' },
-                { icon: '🏭', title: 'Виробництво', desc: 'Сировина, собівартість, виробничі витрати' },
-                { icon: '📊', title: 'Для фінансистів', desc: 'P&L, Cash Flow, баланс — все в одному місці' },
+                { icon: '🏢', title: 'IT та агенції', desc: 'Проекти, зарплати підрядників, клієнтські платежі' },
+                { icon: '🛒', title: 'Торгівля', desc: 'Закупки, продажі, залишки, маржинальність' },
+                { icon: '🏗️', title: 'Будівництво', desc: 'Кошториси, витрати по об\'єктах, аванси' },
+                { icon: '💆', title: 'Послуги', desc: 'Підписки, регулярні доходи, клієнти' },
+                { icon: '🏭', title: 'Виробництво', desc: 'Сировина, собівартість, витрати' },
+                { icon: '📊', title: 'Фінансисти', desc: 'P&L, Cash Flow, баланс в одному місці' },
               ].map((item) => (
-                <div key={item.title} className="group p-5 rounded-2xl border border-[#e5e7eb] hover:border-[#00c896] hover:shadow-sm transition-all cursor-pointer bg-white">
-                  <span className="text-2xl mb-3 block">{item.icon}</span>
-                  <h3 className="font-semibold text-[#111111] mb-1.5">{item.title}</h3>
-                  <p className="text-sm text-[#6b7280] leading-relaxed">{item.desc}</p>
+                <div
+                  key={item.title}
+                  className="group p-5 rounded-2xl border border-white/[0.07] hover:border-[#00c896]/30 hover:bg-[#00c896]/[0.03] transition-all duration-300 cursor-pointer"
+                >
+                  <span className="text-2xl mb-4 block">{item.icon}</span>
+                  <h3 className="font-semibold text-white/85 mb-1.5 text-sm">{item.title}</h3>
+                  <p className="text-xs text-white/35 leading-relaxed">{item.desc}</p>
                 </div>
               ))}
             </div>
@@ -140,75 +179,65 @@ export default function HomePage() {
         </section>
 
         {/* ── FEATURES ── */}
-        <section id="features" className="py-20 px-6 bg-[#f9fafb]">
+        <section id="features" className="py-24 px-6 border-t border-white/[0.06]">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-14">
-              <p className="text-xs font-semibold text-[#00c896] uppercase tracking-widest mb-3">Можливості</p>
-              <h2 className="text-3xl font-bold">Все що потрібно — в одному місці</h2>
+            <div className="mb-16">
+              <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-4">Можливості</p>
+              <h2 className="font-display text-[2.5rem] font-black text-white tracking-[-0.03em]">Все що потрібно</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
               {[
                 {
-                  icon: ArrowLeftRight,
-                  color: '#00c896',
-                  bg: '#f0fdf9',
+                  num: '01', icon: ArrowLeftRight, color: '#00c896',
                   title: 'Транзакції в реальному часі',
-                  desc: 'Додавайте доходи, витрати та перекази. Автокатегоризація, фільтри, пошук, повторювані платежі.',
-                  items: ['Дохід / Витрата / Переказ', 'Фільтр по рахунку та категорії', 'Кольорове кодування'],
+                  desc: 'Доходи, витрати, перекази. Автокатегоризація та фільтри.',
+                  items: ['Дохід / Витрата / Переказ', 'Фільтр по рахунку', 'Кольорове кодування'],
                 },
                 {
-                  icon: BarChart2,
-                  color: '#6366f1',
-                  bg: '#f5f3ff',
+                  num: '02', icon: BarChart2, color: '#818cf8',
                   title: 'Cash Flow та P&L',
-                  desc: 'Графік руху грошей по місяцях і звіт прибутків/збитків з розбивкою по категоріях.',
-                  items: ['Bar chart + лінія балансу', 'Pie charts по категоріях', 'Експорт CSV'],
+                  desc: 'Графік руху грошей і звіт прибутків/збитків по категоріях.',
+                  items: ['Bar chart + лінія балансу', 'Pie charts', 'Експорт CSV'],
                 },
                 {
-                  icon: Calendar,
-                  color: '#f59e0b',
-                  bg: '#fffbeb',
+                  num: '03', icon: Calendar, color: '#fbbf24',
                   title: 'Платіжний календар',
-                  desc: 'Перегляд операцій по днях. Одразу видно де касовий розрив і які платежі заплановані.',
-                  items: ['Навігація по місяцях', 'Щоденні підсумки', 'Заплановані платежі'],
+                  desc: 'Операції по днях. Касовий розрив видно одразу.',
+                  items: ['Навігація по місяцях', 'Щоденні підсумки', 'Заплановані'],
                 },
                 {
-                  icon: Zap,
-                  color: '#ef4444',
-                  bg: '#fef2f2',
+                  num: '04', icon: Zap, color: '#fb923c',
                   title: 'Авторуль категоризації',
-                  desc: 'Налаштуйте правила і система автоматично призначає категорії новим транзакціям.',
-                  items: ['Умови по опису / сумі', 'Автоприсвоєння категорії', 'Вмк./Вимк. правила'],
+                  desc: 'Налаштуйте правила — система автоматично присвоїть категорії.',
+                  items: ['Умови по опису / сумі', 'Автоприсвоєння', 'Вмк./Вимк.'],
                 },
                 {
-                  icon: Shield,
-                  color: '#22c55e',
-                  bg: '#f0fdf4',
+                  num: '05', icon: Shield, color: '#34d399',
                   title: 'Командний доступ',
-                  desc: 'Запрошуйте колег з різними ролями. Власник, адмін, редактор, переглядач.',
-                  items: ['4 рівні доступу', 'Журнал дій', 'Multi-org підтримка'],
-                },
-                {
-                  icon: Users,
-                  color: '#f97316',
-                  bg: '#fff7ed',
-                  title: 'Запити на оплату',
-                  desc: 'Менеджери створюють запити — фінансист перевіряє по бюджету і підтверджує.',
-                  items: ['Перевірка бюджету', 'Апрув фінансиста', 'Статуси запитів'],
+                  desc: 'Запрошуйте колег з різними ролями. Власник, адмін, редактор.',
+                  items: ['4 рівні доступу', 'Журнал дій', 'Multi-org'],
                 },
               ].map((f) => {
                 const Icon = f.icon
                 return (
-                  <div key={f.title} className="bg-white rounded-2xl border border-[#e5e7eb] p-6">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: f.bg }}>
-                      <Icon className="w-5 h-5" style={{ color: f.color }} />
+                  <div
+                    key={f.title}
+                    className="group grid md:grid-cols-[72px_1fr_220px] gap-6 items-center px-6 py-5 rounded-2xl border border-white/[0.06] hover:border-white/[0.11] hover:bg-white/[0.018] transition-all duration-300"
+                  >
+                    <span className="font-display text-[2.75rem] font-black text-white/[0.05] tabular-nums leading-none select-none">
+                      {f.num}
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2.5 mb-1.5">
+                        <Icon className="w-4 h-4 shrink-0" style={{ color: f.color }} />
+                        <h3 className="font-semibold text-white/85 text-[0.9375rem]">{f.title}</h3>
+                      </div>
+                      <p className="text-sm text-white/38 leading-relaxed">{f.desc}</p>
                     </div>
-                    <h3 className="font-semibold text-lg text-[#111111] mb-2">{f.title}</h3>
-                    <p className="text-sm text-[#6b7280] leading-relaxed mb-4">{f.desc}</p>
-                    <ul className="space-y-1.5">
+                    <ul className="hidden md:flex flex-col gap-1.5">
                       {f.items.map((item) => (
-                        <li key={item} className="flex items-center gap-2 text-sm text-[#374151]">
-                          <Check className="w-3.5 h-3.5 text-[#00c896] shrink-0" />
+                        <li key={item} className="flex items-center gap-2 text-xs text-white/35">
+                          <Check className="w-3 h-3 text-[#00c896]/70 shrink-0" />
                           {item}
                         </li>
                       ))}
@@ -221,44 +250,42 @@ export default function HomePage() {
         </section>
 
         {/* ── VS EXCEL ── */}
-        <section className="py-20 px-6">
+        <section className="py-24 px-6 border-t border-white/[0.06]">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-12">
-              <p className="text-xs font-semibold text-[#00c896] uppercase tracking-widest mb-3">Порівняння</p>
-              <h2 className="text-3xl font-bold">Чому не Excel?</h2>
-              <p className="text-[#6b7280] mt-3">Excel — інструмент для таблиць, не для фінансового обліку команди</p>
+            <div className="mb-14">
+              <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-4">Порівняння</p>
+              <h2 className="font-display text-[2.5rem] font-black text-white tracking-[-0.03em]">Чому не Excel?</h2>
+              <p className="text-white/38 mt-3 text-base">Excel — інструмент для таблиць, не для фінансового обліку команди</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-2xl border border-[#fecaca] bg-[#fff5f5] p-6">
-                <p className="font-semibold text-[#ef4444] mb-4">Excel / Google Sheets</p>
-                <ul className="space-y-3">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="rounded-2xl border border-white/[0.07] bg-[#0d0d0d] p-7">
+                <p className="text-[11px] font-bold text-white/25 uppercase tracking-[0.2em] mb-6">Excel / Google Sheets</p>
+                <ul className="space-y-4">
                   {[
                     'Ручне зведення кожного місяця',
                     'Формули ламаються при редагуванні',
                     'Немає спільного доступу в реальному часі',
                     'Помилки при копіюванні',
                     'Немає автоматичних звітів',
-                    'Категорії — вручну, щоразу',
                   ].map((t) => (
-                    <li key={t} className="flex items-start gap-2 text-sm text-[#374151]">
-                      <span className="text-[#ef4444] mt-0.5 shrink-0">✕</span>
+                    <li key={t} className="flex items-start gap-3 text-sm text-white/30">
+                      <span className="text-red-500/40 shrink-0 mt-0.5 leading-none text-base">—</span>
                       {t}
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="rounded-2xl border border-[#a7f3d0] bg-[#f0fdf9] p-6">
-                <p className="font-semibold text-[#00c896] mb-4">FinFlow</p>
-                <ul className="space-y-3">
+              <div className="rounded-2xl border border-[#00c896]/20 bg-[#00c896]/[0.025] p-7">
+                <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.2em] mb-6">FinFlow</p>
+                <ul className="space-y-4">
                   {[
                     'Автоматичний підрахунок в реальному часі',
                     'Дані зберігаються без формул',
                     'Доступ для команди з будь-якого пристрою',
                     'Редагуйте що завгодно — нічого не ламається',
                     'Cash Flow і P&L готові автоматично',
-                    'Автокатегоризація за правилами',
                   ].map((t) => (
-                    <li key={t} className="flex items-start gap-2 text-sm text-[#374151]">
+                    <li key={t} className="flex items-start gap-3 text-sm text-white/70">
                       <Check className="w-3.5 h-3.5 text-[#00c896] mt-0.5 shrink-0" />
                       {t}
                     </li>
@@ -270,42 +297,28 @@ export default function HomePage() {
         </section>
 
         {/* ── TESTIMONIALS ── */}
-        <section className="py-20 px-6 bg-[#f9fafb]">
+        <section className="py-24 px-6 border-t border-white/[0.06]">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <p className="text-xs font-semibold text-[#00c896] uppercase tracking-widest mb-3">Відгуки</p>
-              <h2 className="text-3xl font-bold">Що кажуть наші клієнти</h2>
+            <div className="mb-14">
+              <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-4">Відгуки</p>
+              <h2 className="font-display text-[2.5rem] font-black text-white tracking-[-0.03em]">Що кажуть клієнти</h2>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid md:grid-cols-3 gap-4">
               {[
-                {
-                  text: '"Нарешті можу бачити реальний стан фінансів компанії без зведення таблиць. За 10 хвилин налаштував рахунки і почав вести облік."',
-                  name: 'Олексій Ковальчук',
-                  role: 'CEO, IT-агенція Kyiv',
-                  avatar: 'О',
-                },
-                {
-                  text: '"Cash Flow по місяцях — саме те що шукали. Тепер фінансист готує звіт для інвесторів за 5 хвилин замість 2 годин."',
-                  name: 'Марина Дорошенко',
-                  role: 'CFO, e-commerce',
-                  avatar: 'М',
-                },
-                {
-                  text: '"Використовуємо замість 1С для оперативного обліку. Простіше, швидше, не потребує бухгалтера для налаштування."',
-                  name: 'Piotr Kowalski',
-                  role: 'Власник, будівельна компанія PL',
-                  avatar: 'P',
-                },
+                { text: 'Нарешті можу бачити реальний стан фінансів без зведення таблиць. За 10 хвилин налаштував рахунки.', name: 'Олексій Ковальчук', role: 'CEO, IT-агенція Kyiv', a: 'О' },
+                { text: 'Cash Flow по місяцях — саме те що шукали. Фінансист готує звіт для інвесторів за 5 хвилин.', name: 'Марина Дорошенко', role: 'CFO, e-commerce', a: 'М' },
+                { text: 'Простіше за 1С для оперативного обліку. Не потребує бухгалтера для налаштування.', name: 'Piotr Kowalski', role: 'Власник, будівництво PL', a: 'P' },
               ].map((t) => (
-                <div key={t.name} className="bg-white rounded-2xl border border-[#e5e7eb] p-6">
-                  <p className="text-sm text-[#374151] leading-relaxed mb-5 italic">{t.text}</p>
+                <div key={t.name} className="p-6 rounded-2xl border border-white/[0.07] bg-[#0d0d0d] flex flex-col">
+                  <p className="font-display text-4xl text-[#00c896]/20 leading-none mb-5 select-none">"</p>
+                  <p className="text-sm text-white/55 leading-relaxed mb-6 flex-1">{t.text}</p>
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#00c896] flex items-center justify-center text-white font-semibold text-sm shrink-0">
-                      {t.avatar}
+                    <div className="w-8 h-8 rounded-full bg-[#00c896]/15 border border-[#00c896]/20 flex items-center justify-center text-[#00c896] font-bold text-xs shrink-0">
+                      {t.a}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[#111111]">{t.name}</p>
-                      <p className="text-xs text-[#9ca3af]">{t.role}</p>
+                      <p className="text-sm font-semibold text-white/75">{t.name}</p>
+                      <p className="text-xs text-white/30 mt-0.5">{t.role}</p>
                     </div>
                   </div>
                 </div>
@@ -315,48 +328,71 @@ export default function HomePage() {
         </section>
 
         {/* ── PRICING TEASER ── */}
-        <section className="py-20 px-6">
-          <div className="max-w-4xl mx-auto">
+        <section className="py-24 px-6 border-t border-white/[0.06]">
+          <div className="max-w-[440px] mx-auto">
             <div className="text-center mb-10">
-              <p className="text-xs font-semibold text-[#00c896] uppercase tracking-widest mb-3">Тарифи</p>
-              <h2 className="text-3xl font-bold">Проста ціна без сюрпризів</h2>
-              <p className="text-[#6b7280] mt-3">Один тариф — повний доступ до всіх функцій</p>
+              <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-4">Тарифи</p>
+              <h2 className="font-display text-[2.5rem] font-black text-white tracking-[-0.03em]">Проста ціна</h2>
             </div>
-            <div className="max-w-sm mx-auto rounded-2xl border-2 border-[#00c896] bg-white p-8 text-center shadow-lg shadow-[#00c89615]">
-              <p className="text-sm font-semibold text-[#00c896] uppercase tracking-wider mb-2">Pro</p>
-              <div className="flex items-baseline justify-center gap-1 mb-1">
-                <span className="text-4xl font-bold">$29</span>
-                <span className="text-[#6b7280]">/ міс</span>
+            <div className="rounded-2xl border border-[#00c896]/20 bg-[#0d0d0d] p-8">
+              <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.2em] mb-5">Pro</p>
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="font-display text-[3.5rem] font-black text-white tracking-tight leading-none">$29</span>
+                <span className="text-white/35 text-lg">/ міс</span>
               </div>
-              <p className="text-sm text-[#9ca3af] mb-6">або $290 / рік (економія 2 місяці)</p>
-              <ul className="space-y-3 text-sm text-left mb-8">
-                {['Необмежені транзакції', 'Необмежені рахунки', 'Cash Flow + P&L + Баланс', 'Командний доступ (до 5 осіб)', 'Авторуль категоризації', 'Експорт CSV / PDF'].map((f) => (
-                  <li key={f} className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#00c896] shrink-0" />
-                    <span className="text-[#374151]">{f}</span>
+              <p className="text-sm text-white/25 mb-8">або $290 / рік — економія 2 місяці</p>
+              <ul className="space-y-3 mb-8">
+                {[
+                  'Необмежені транзакції',
+                  'Необмежені рахунки',
+                  'Cash Flow + P&L + Баланс',
+                  'Командний доступ (до 5 осіб)',
+                  'Автоматична категоризація',
+                  'Експорт CSV / PDF',
+                ].map((f) => (
+                  <li key={f} className="flex items-center gap-3 text-sm text-white/60">
+                    <Check className="w-3.5 h-3.5 text-[#00c896] shrink-0" />
+                    {f}
                   </li>
                 ))}
               </ul>
-              <Link href="/register" className="inline-flex items-center justify-center w-full bg-[#00c896] hover:bg-[#00b384] text-white rounded-xl font-semibold h-11 transition-colors">
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center w-full bg-[#00c896] hover:bg-[#00daa6] text-black font-bold rounded-xl h-12 transition-all duration-200"
+                style={{ boxShadow: '0 0 40px hsla(161,100%,39%,0.2)' }}
+              >
                 Почати 14 днів безкоштовно
               </Link>
-              <p className="text-xs text-[#9ca3af] mt-3">Кредитна картка не потрібна</p>
+              <p className="text-xs text-white/22 text-center mt-3">Кредитна картка не потрібна</p>
             </div>
           </div>
         </section>
 
         {/* ── CTA FINAL ── */}
-        <section className="py-24 px-6 bg-gradient-to-br from-[#00c896] to-[#00a87e] text-white">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Почніть вести облік сьогодні
+        <section className="grain relative py-28 px-6 overflow-hidden border-t border-white/[0.06] bg-[#0a0a0a]">
+          <div
+            className="absolute inset-x-0 top-0 h-px pointer-events-none"
+            style={{ background: 'linear-gradient(90deg, transparent, hsla(161,100%,39%,0.4), transparent)' }}
+          />
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse 60% 50% at 50% 0%, hsla(161,100%,39%,0.06) 0%, transparent 100%)' }}
+          />
+          <div className="relative max-w-2xl mx-auto text-center">
+            <h2 className="font-display text-[3rem] md:text-[3.75rem] font-black text-white tracking-[-0.04em] leading-[1.02] mb-6">
+              Почніть вести облік<br />
+              <span className="text-[#00c896]">сьогодні</span>
             </h2>
-            <p className="text-white/80 text-lg mb-8">
-              14 днів повного доступу. Налаштування за 4 хвилини. Без кредитної картки.
+            <p className="text-white/40 text-lg mb-10 leading-relaxed">
+              14 днів повного доступу. Налаштування за 4 хвилини.<br className="hidden md:block" />Без кредитної картки.
             </p>
-            <Link href="/register" className="inline-flex items-center gap-2 bg-white text-[#00c896] hover:bg-white/90 rounded-xl font-bold h-12 px-10 text-base transition-colors shadow-lg">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2.5 bg-[#00c896] hover:bg-[#00daa6] text-black font-black h-14 px-12 rounded-xl text-base transition-all duration-200"
+              style={{ boxShadow: '0 0 60px hsla(161,100%,39%,0.3)' }}
+            >
               Створити акаунт безкоштовно
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </section>
@@ -364,21 +400,21 @@ export default function HomePage() {
       </main>
 
       {/* ── FOOTER ── */}
-      <footer className="border-t border-[#e5e7eb] py-10 px-6">
+      <footer className="border-t border-white/[0.06] py-10 px-6 bg-[#0a0a0a]">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-[5px] bg-[#00c896] flex items-center justify-center">
-              <span className="text-white font-bold text-xs">F</span>
+            <div className="w-6 h-6 rounded-md bg-[#00c896] flex items-center justify-center">
+              <span className="text-black font-black text-xs">F</span>
             </div>
-            <span className="font-semibold">FinFlow</span>
+            <span className="font-display font-bold text-white/50 text-sm">FinFlow</span>
           </div>
-          <nav className="flex items-center gap-6 text-sm text-[#6b7280]">
-            <Link href="#features" className="hover:text-[#111111] transition-colors">Можливості</Link>
-            <Link href="/pricing" className="hover:text-[#111111] transition-colors">Ціни</Link>
-            <Link href="#" className="hover:text-[#111111] transition-colors">Конфіденційність</Link>
-            <Link href="#" className="hover:text-[#111111] transition-colors">Умови</Link>
+          <nav className="flex items-center gap-6 text-sm text-white/25">
+            <Link href="#features" className="hover:text-white/60 transition-colors">Можливості</Link>
+            <Link href="/pricing" className="hover:text-white/60 transition-colors">Ціни</Link>
+            <Link href="#" className="hover:text-white/60 transition-colors">Конфіденційність</Link>
+            <Link href="#" className="hover:text-white/60 transition-colors">Умови</Link>
           </nav>
-          <p className="text-sm text-[#9ca3af]">© 2026 FinFlow</p>
+          <p className="text-sm text-white/18">© 2026 FinFlow</p>
         </div>
       </footer>
 

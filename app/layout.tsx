@@ -1,13 +1,22 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Unbounded, Manrope } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/lib/hooks/useAuth'
 import { OrgProvider } from '@/lib/hooks/useOrg'
 import { Toaster } from '@/components/ui/sonner'
 
-const inter = Inter({
-  variable: '--font-inter',
+const unbounded = Unbounded({
+  variable: '--font-display',
   subsets: ['latin', 'cyrillic'],
+  weight: ['400', '600', '700', '800', '900'],
+  display: 'swap',
+})
+
+const manrope = Manrope({
+  variable: '--font-body',
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
@@ -21,8 +30,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="uk" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#0f0f0f]">
+    <html lang="uk" className={`${unbounded.variable} ${manrope.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-[#0a0a0a]">
         <AuthProvider>
           <OrgProvider>
             {children}
