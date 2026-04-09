@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Unbounded, Manrope } from 'next/font/google'
+import { ThemeProvider } from 'next-themes'
 import './globals.css'
 import { AuthProvider } from '@/lib/hooks/useAuth'
 import { OrgProvider } from '@/lib/hooks/useOrg'
@@ -30,14 +31,16 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="uk" className={`${unbounded.variable} ${manrope.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-[#0a0a0a]">
-        <AuthProvider>
-          <OrgProvider>
-            {children}
-            <Toaster />
-          </OrgProvider>
-        </AuthProvider>
+    <html lang="uk" className={`${unbounded.variable} ${manrope.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <AuthProvider>
+            <OrgProvider>
+              {children}
+              <Toaster />
+            </OrgProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
