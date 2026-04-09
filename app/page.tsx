@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Check, BarChart2, Calendar, ArrowLeftRight, Shield, Zap } from 'lucide-react'
+import { ArrowRight, Check, BarChart2, Calendar, ArrowLeftRight, Shield, Zap, Code2, ShoppingCart, HardHat, Briefcase, Factory, PieChart } from 'lucide-react'
 import { LandingNavLogin, LandingHeroLogin } from '@/components/landing/LandingAuthButtons'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -152,22 +152,27 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { icon: '🏢', title: 'IT та агенції', desc: 'Проекти, зарплати підрядників, клієнтські платежі' },
-                { icon: '🛒', title: 'Торгівля', desc: 'Закупки, продажі, залишки, маржинальність' },
-                { icon: '🏗️', title: 'Будівництво', desc: 'Кошториси, витрати по об\'єктах, аванси' },
-                { icon: '💆', title: 'Послуги', desc: 'Підписки, регулярні доходи, клієнти' },
-                { icon: '🏭', title: 'Виробництво', desc: 'Сировина, собівартість, витрати' },
-                { icon: '📊', title: 'Фінансисти', desc: 'P&L, Cash Flow, баланс в одному місці' },
-              ].map((item) => (
+                { icon: Code2,        color: '#6366f1', bg: 'bg-[#6366f1]/10 dark:bg-[#6366f1]/10', title: 'IT та агенції',  desc: 'Проекти, зарплати підрядників, клієнтські платежі' },
+                { icon: ShoppingCart, color: '#f59e0b', bg: 'bg-[#f59e0b]/10 dark:bg-[#f59e0b]/10', title: 'Торгівля',       desc: 'Закупки, продажі, залишки, маржинальність' },
+                { icon: HardHat,      color: '#fb923c', bg: 'bg-[#fb923c]/10 dark:bg-[#fb923c]/10', title: 'Будівництво',    desc: 'Кошториси, витрати по об\'єктах, аванси' },
+                { icon: Briefcase,    color: '#00c896', bg: 'bg-[#00c896]/10 dark:bg-[#00c896]/10', title: 'Послуги',         desc: 'Підписки, регулярні доходи, клієнти' },
+                { icon: Factory,      color: '#64748b', bg: 'bg-[#64748b]/10 dark:bg-[#64748b]/10', title: 'Виробництво',    desc: 'Сировина, собівартість, витрати' },
+                { icon: PieChart,     color: '#ec4899', bg: 'bg-[#ec4899]/10 dark:bg-[#ec4899]/10', title: 'Фінансисти',     desc: 'P&L, Cash Flow, баланс в одному місці' },
+              ].map((item) => {
+                const Icon = item.icon
+                return (
                 <div
                   key={item.title}
                   className="group p-5 rounded-2xl border border-black/[0.08] dark:border-white/[0.07] hover:border-[#00c896]/30 hover:bg-[#00c896]/[0.02] dark:hover:bg-[#00c896]/[0.03] transition-all duration-300 cursor-pointer bg-white dark:bg-transparent"
                 >
-                  <span className="text-2xl mb-4 block">{item.icon}</span>
+                  <div className={`w-9 h-9 rounded-xl ${item.bg} flex items-center justify-center mb-4`}>
+                    <Icon className="w-4 h-4" style={{ color: item.color }} />
+                  </div>
                   <h3 className="font-semibold text-[#0d0d0d]/85 dark:text-white/85 mb-1.5 text-sm">{item.title}</h3>
                   <p className="text-xs text-black/38 dark:text-white/35 leading-relaxed">{item.desc}</p>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </section>
