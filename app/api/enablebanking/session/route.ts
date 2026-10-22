@@ -1,39 +1,59 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { createJwt } from '@/lib/enablebanking/jwt'
+import { requireOrgMember, requireUserFromBearer } from '@/lib/server/auth'
+import { signEbState } from '@/lib/server/eb-state'
+import { errorResponse, HttpError } from '@/lib/server/http-error'
+
+export const runtime = 'nodejs'
 
 const BASE = 'https://api.enablebanking.com'
+const ID_RE = /^[A-Za-z0-9_-]{1,128}$/
+const COUNTRY_RE = /^[A-Z]{2}$/
 
-// POST /api/enablebanking/session  { aspspName, country, orgId }
-export async function POST(req: NextRequest) {
+// POST /api/enablebanking/session  { aspspName, aspspCountry?, orgId }
+// Requires `Authorization: Bearer <Firebase ID token>` of a member of `orgId`.
+export async function POST(req: Request) {
   try {
-    const { aspspName, country, orgId } = await req.json()
-    if (!aspspName || !orgId) return NextResponse.json({ error: 'Missing params' }, { status: 400 })
+    const { uid } = await requireUserFromBearer(req)
 
-    const token = await createJwt()
-    const redirectUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/enablebanking/callback`
-
-    const body = {
-      access: {
-        valid_until: new Date(Date.now() + 90 * 86400_000).toISOString(),
-        balances: true,
-        transactions: true,
-      },
-      aspsp: { name: aspspName, country: country ?? 'PL' },
-      redirect_url: redirectUrl,
-      psu_type: 'personal',
-      state: Buffer.from(JSON.stringify({ orgId })).toString('base64url'),
+    const body: unknown = await req.json().catch(() => null)
+    const { aspspName, aspspCountry = 'PL', orgId } = (body ?? {}) as Record<string, unknown>
+    if (typeof aspspName !== 'string' || aspspName.length === 0 || aspspName.length > 200) {
+      throw new HttpError(400, 'Missing params')
     }
+    if (typeof orgId !== 'string' || !ID_RE.test(orgId)) throw new HttpError(400, 'Missing params')
+    if (typeof aspspCountry !== 'string' || !COUNTRY_RE.test(aspspCountry)) {
+      throw new HttpError(400, 'invalid country')
+    }
+
+    await requireOrgMember(uid, orgId)
+
+    const state = signEbState({ orgId, uid }, process.env.EB_STATE_SECRET!)
+    const token = await createJwt()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
 
     const res = await fetch(`${BASE}/auth`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        access: {
+          valid_until: new Date(Date.now() + 90 * 86400_000).toISOString(),
+          balances: true,
+          transactions: true,
+        },
+        aspsp: { name: aspspName, country: aspspCountry },
+        redirect_url: `${appUrl}/api/enablebanking/callback`,
+        psu_type: 'personal',
+        state,
+      }),
     })
 
-    if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: res.status })
+    if (!res.ok) {
+      console.error('Enable Banking POST /auth failed:', res.status, await res.text())
+      throw new HttpError(502, 'enable banking error')
+    }
     const data = await res.json()
-    return NextResponse.json({ url: data.url, authorizationId: data.authorization_id })
+    return Response.json({ url: data.url, authorizationId: data.authorization_id })
   } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    return errorResponse(e)
   }
 }
