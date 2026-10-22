@@ -48,3 +48,19 @@ next-env.d.ts
 
 # local secrets (keys, certs)
 .secrets/
+
+# test artefacts
+test-results/
+playwright-report/
+/blob-report/
+/playwright/.cache/
+/tests/screenshots/
+
+# local logs (dev server, Firebase emulators)
+dev.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# committed env template (names only)
+!.env.example

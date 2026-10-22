@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Check, BarChart2, Calendar, ArrowLeftRight, Shield, Zap, Code2, ShoppingCart, HardHat, Briefcase, Factory, PieChart } from 'lucide-react'
+import { ArrowRight, Check, BarChart2, Calendar, ArrowLeftRight, Code2, ShoppingCart, HardHat, Briefcase, Factory, PieChart } from 'lucide-react'
 import { LandingNavLogin, LandingHeroLogin } from '@/components/landing/LandingAuthButtons'
 import { ThemeToggle } from '@/components/ThemeToggle'
 
@@ -75,7 +75,6 @@ export default function HomePage() {
                 </Link>
                 <LandingHeroLogin />
               </div>
-              <p className="animate-fade-up-5 text-xs text-black/25 dark:text-white/25 mt-5">Приєднались 2 400+ компаній з України та Польщі</p>
             </div>
 
             {/* Right: Dashboard preview */}
@@ -126,25 +125,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── STATS ── */}
-        <section className="border-y border-black/[0.07] dark:border-white/[0.06] py-12 px-6">
-          <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: '2 400+', label: 'компаній' },
-              { value: '94%', label: 'рекомендують' },
-              { value: '14 днів', label: 'безкоштовно' },
-              { value: '4 хв', label: 'налаштування' },
-            ].map((s) => (
-              <div key={s.label}>
-                <p className="font-display text-3xl font-black text-[#0d0d0d] dark:text-white tracking-tight tabular-nums">{s.value}</p>
-                <p className="text-sm text-black/35 dark:text-white/35 mt-1.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {/* ── FOR WHOM ── */}
-        <section id="industries" className="py-24 px-6">
+        <section id="industries" className="py-24 px-6 border-t border-black/[0.07] dark:border-white/[0.06]">
           <div className="max-w-5xl mx-auto">
             <div className="mb-14">
               <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-4">Для кого</p>
@@ -186,11 +168,9 @@ export default function HomePage() {
             </div>
             <div className="space-y-2">
               {[
-                { num: '01', icon: ArrowLeftRight, color: '#00c896', title: 'Транзакції в реальному часі', desc: 'Доходи, витрати, перекази. Автокатегоризація та фільтри.', items: ['Дохід / Витрата / Переказ', 'Фільтр по рахунку', 'Кольорове кодування'] },
+                { num: '01', icon: ArrowLeftRight, color: '#00c896', title: 'Транзакції в реальному часі', desc: 'Доходи, витрати, перекази. Пошук і фільтри за рахунком, категорією та датою.', items: ['Дохід / Витрата / Переказ', 'Фільтр по рахунку', 'Кольорове кодування'] },
                 { num: '02', icon: BarChart2, color: '#818cf8', title: 'Cash Flow та P&L', desc: 'Графік руху грошей і звіт прибутків/збитків по категоріях.', items: ['Bar chart + лінія балансу', 'Pie charts', 'Експорт CSV'] },
-                { num: '03', icon: Calendar, color: '#f59e0b', title: 'Платіжний календар', desc: 'Операції по днях. Касовий розрив видно одразу.', items: ['Навігація по місяцях', 'Щоденні підсумки', 'Заплановані'] },
-                { num: '04', icon: Zap, color: '#fb923c', title: 'Авторуль категоризації', desc: 'Налаштуйте правила — система автоматично присвоїть категорії.', items: ['Умови по опису / сумі', 'Автоприсвоєння', 'Вмк./Вимк.'] },
-                { num: '05', icon: Shield, color: '#34d399', title: 'Командний доступ', desc: 'Запрошуйте колег з різними ролями. Власник, адмін, редактор.', items: ['4 рівні доступу', 'Журнал дій', 'Multi-org'] },
+                { num: '03', icon: Calendar, color: '#f59e0b', title: 'Платіжний календар', desc: 'Операції по днях. Касовий розрив видно одразу.', items: ['Навігація по місяцях', 'Щоденні підсумки', 'Залишок на кожен день'] },
               ].map((f) => {
                 const Icon = f.icon
                 return (
@@ -235,7 +215,7 @@ export default function HomePage() {
               <div className="rounded-2xl border border-black/[0.08] dark:border-white/[0.07] bg-white dark:bg-[#0d0d0d] p-7">
                 <p className="text-[11px] font-bold text-black/25 dark:text-white/25 uppercase tracking-[0.2em] mb-6">Excel / Google Sheets</p>
                 <ul className="space-y-4">
-                  {['Ручне зведення кожного місяця', 'Формули ламаються при редагуванні', 'Немає спільного доступу в реальному часі', 'Помилки при копіюванні', 'Немає автоматичних звітів'].map((t) => (
+                  {['Ручне зведення кожного місяця', 'Формули ламаються при редагуванні', 'Помилки при копіюванні', 'Немає автоматичних звітів'].map((t) => (
                     <li key={t} className="flex items-start gap-3 text-sm text-black/35 dark:text-white/30">
                       <span className="text-red-500/50 shrink-0 mt-0.5 leading-none text-base">—</span>
                       {t}
@@ -246,7 +226,7 @@ export default function HomePage() {
               <div className="rounded-2xl border border-[#00c896]/20 bg-[#00c896]/[0.025] p-7">
                 <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.2em] mb-6">FinFlow</p>
                 <ul className="space-y-4">
-                  {['Автоматичний підрахунок в реальному часі', 'Дані зберігаються без формул', 'Доступ для команди з будь-якого пристрою', 'Редагуйте що завгодно — нічого не ламається', 'Cash Flow і P&L готові автоматично'].map((t) => (
+                  {['Автоматичний підрахунок в реальному часі', 'Дані зберігаються без формул', 'Доступ з будь-якого пристрою', 'Редагуйте що завгодно — нічого не ламається', 'Cash Flow і P&L готові автоматично'].map((t) => (
                     <li key={t} className="flex items-start gap-3 text-sm text-[#0d0d0d]/72 dark:text-white/70">
                       <Check className="w-3.5 h-3.5 text-[#00c896] mt-0.5 shrink-0" />
                       {t}
@@ -254,37 +234,6 @@ export default function HomePage() {
                   ))}
                 </ul>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── TESTIMONIALS ── */}
-        <section className="py-24 px-6 border-t border-black/[0.07] dark:border-white/[0.06]">
-          <div className="max-w-5xl mx-auto">
-            <div className="mb-14">
-              <p className="text-[11px] font-bold text-[#00c896] uppercase tracking-[0.25em] mb-4">Відгуки</p>
-              <h2 className="font-display text-[2.5rem] font-black text-[#0d0d0d] dark:text-white tracking-[-0.03em]">Що кажуть клієнти</h2>
-            </div>
-            <div className="grid md:grid-cols-3 gap-4">
-              {[
-                { text: 'Нарешті можу бачити реальний стан фінансів без зведення таблиць. За 10 хвилин налаштував рахунки.', name: 'Олексій Ковальчук', role: 'CEO, IT-агенція Kyiv', a: 'О' },
-                { text: 'Cash Flow по місяцях — саме те що шукали. Фінансист готує звіт для інвесторів за 5 хвилин.', name: 'Марина Дорошенко', role: 'CFO, e-commerce', a: 'М' },
-                { text: 'Простіше за 1С для оперативного обліку. Не потребує бухгалтера для налаштування.', name: 'Piotr Kowalski', role: 'Власник, будівництво PL', a: 'P' },
-              ].map((t) => (
-                <div key={t.name} className="p-6 rounded-2xl border border-black/[0.08] dark:border-white/[0.07] bg-white dark:bg-[#0d0d0d] flex flex-col">
-                  <p className="font-display text-4xl text-[#00c896]/25 leading-none mb-5 select-none">"</p>
-                  <p className="text-sm text-black/55 dark:text-white/55 leading-relaxed mb-6 flex-1">{t.text}</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#00c896]/12 border border-[#00c896]/20 flex items-center justify-center text-[#00c896] font-bold text-xs shrink-0">
-                      {t.a}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#0d0d0d]/75 dark:text-white/75">{t.name}</p>
-                      <p className="text-xs text-black/32 dark:text-white/30 mt-0.5">{t.role}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </section>
@@ -304,7 +253,7 @@ export default function HomePage() {
               </div>
               <p className="text-sm text-black/28 dark:text-white/25 mb-8">або $290 / рік — економія 2 місяці</p>
               <ul className="space-y-3 mb-8">
-                {['Необмежені транзакції', 'Необмежені рахунки', 'Cash Flow + P&L + Баланс', 'Командний доступ (до 5 осіб)', 'Автоматична категоризація', 'Експорт CSV / PDF'].map((f) => (
+                {['Необмежені транзакції', 'Необмежені рахунки', 'Cash Flow + P&L + Баланс', 'Платіжний календар', 'Експорт CSV'].map((f) => (
                   <li key={f} className="flex items-center gap-3 text-sm text-black/60 dark:text-white/60">
                     <Check className="w-3.5 h-3.5 text-[#00c896] shrink-0" />
                     {f}
