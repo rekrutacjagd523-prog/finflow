@@ -4,11 +4,10 @@ import {
   addDoc,
   getDoc,
   getDocs,
-  query,
-  where,
   Timestamp,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { userOrganizationsQuery } from './queries'
 import type { Organization } from '@/types'
 
 export async function createOrganization(
@@ -53,12 +52,7 @@ export async function getOrganization(orgId: string): Promise<Organization | nul
 }
 
 export async function getUserOrganizations(userId: string): Promise<Organization[]> {
-  const q = query(
-    collection(db, 'organizations'),
-    where(`members.${userId}.role`, '!=', null)
-  )
-
-  const snapshot = await getDocs(q)
+  const snapshot = await getDocs(userOrganizationsQuery(db, userId))
 
   return snapshot.docs.map((docSnap) => {
     const data = docSnap.data()
