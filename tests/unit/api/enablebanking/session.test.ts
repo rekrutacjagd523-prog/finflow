@@ -64,18 +64,27 @@ describe('POST /api/enablebanking/session', () => {
     const res = await POST(sessionRequest({ aspspName: 'Mock ASPSP' }, 'token-alice'))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Missing params' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('returns 400 when aspspName is missing', async () => {
     const res = await POST(sessionRequest({ orgId: 'org-acme' }, 'token-alice'))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Missing params' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('returns 400 for a malformed aspspCountry', async () => {
     const res = await POST(sessionRequest({ ...VALID_BODY, aspspCountry: 'pl;' }, 'token-alice'))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'invalid country' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 for a malformed orgId and does not call Enable Banking', async () => {
+    const res = await POST(sessionRequest({ ...VALID_BODY, orgId: '../x' }, 'token-alice'))
+    expect(res.status).toBe(400)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('returns 403 when the caller is not a member of the org', async () => {
@@ -141,5 +150,33 @@ describe('POST /api/enablebanking/session', () => {
     expect(res.status).toBe(500)
     expect(await res.json()).toEqual({ error: 'server not configured' })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('in production, refuses to fall back to the request origin when NEXT_PUBLIC_APP_URL is missing', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
+    const res = await POST(sessionRequest(VALID_BODY, 'token-alice'))
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'server not configured' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('in production, uses NEXT_PUBLIC_APP_URL when it is set', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    fetchMock.mockResolvedValueOnce(upstreamJson({ url: 'https://x.test', authorization_id: 'a1' }))
+    const res = await POST(sessionRequest(VALID_BODY, 'token-alice'))
+    expect(res.status).toBe(200)
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body)).redirect_url).toBe(`${TEST_APP_URL}/api/enablebanking/callback`)
+  })
+
+  it('outside production, falls back to the request origin when NEXT_PUBLIC_APP_URL is missing', async () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '')
+    fetchMock.mockResolvedValueOnce(upstreamJson({ url: 'https://x.test', authorization_id: 'a1' }))
+    const res = await POST(sessionRequest(VALID_BODY, 'token-alice'))
+    expect(res.status).toBe(200)
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body)).redirect_url).toBe('http://localhost:3000/api/enablebanking/callback')
   })
 })

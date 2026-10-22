@@ -7,6 +7,12 @@ export const runtime = 'nodejs'
 
 const BASE = 'https://api.enablebanking.com'
 
+/** Strips control characters (log forging via CR/LF/ESC) and truncates untrusted query values for logging. */
+function sanitizeForLog(value: string | null, max = 200): string {
+  const clean = (value ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
+  return clean.length > max ? `${clean.slice(0, max)}...` : clean
+}
+
 function redirectTo(req: Request, path: string): Response {
   return new Response(null, { status: 307, headers: { Location: new URL(path, req.url).toString() } })
 }
@@ -34,7 +40,11 @@ export async function GET(req: Request) {
 
   // No code: the user cancelled at the bank or Enable Banking returned ?error=...
   if (!code) {
-    console.error('Enable Banking callback without code:', params.get('error'), params.get('error_description'))
+    console.error(
+      'Enable Banking callback without code:',
+      sanitizeForLog(params.get('error')),
+      sanitizeForLog(params.get('error_description')),
+    )
     return redirectTo(req, `${settingsPath}?eb_error=1`)
   }
 

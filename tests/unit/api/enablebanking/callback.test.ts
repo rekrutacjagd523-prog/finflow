@@ -112,6 +112,26 @@ describe('GET /api/enablebanking/callback', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('sanitizes error / error_description before logging (no log forging)', async () => {
+    errorSpy.mockRestore()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    errorSpy = log
+    await GET(
+      callbackRequest({
+        state: aliceState(),
+        error: 'access_denied\nFAKE LOG LINE: admin logged in',
+        error_description: 'x\r\u0000\u001b[31m' + 'a'.repeat(500),
+      }),
+    )
+    const logged = log.mock.calls.flat().filter((a): a is string => typeof a === 'string')
+    expect(logged.length).toBeGreaterThan(0)
+    for (const a of logged) {
+      expect(a).not.toMatch(/[\u0000-\u001f\u007f]/)
+    }
+    expect(logged.join('|')).toContain('access_denied')
+    expect(logged.some((a) => a.includes('a'.repeat(201)))).toBe(false)
+  })
+
   it('redirects to settings with eb_error=1 when the code exchange fails', async () => {
     fetchMock.mockResolvedValueOnce(upstreamJson({ message: 'invalid code' }, 400))
     const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }))

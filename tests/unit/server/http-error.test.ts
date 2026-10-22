@@ -10,6 +10,25 @@ describe('HttpError', () => {
     expect(err.message).toBe('forbidden')
     expect(err.name).toBe('HttpError')
   })
+
+  it('keeps a valid 4xx/5xx status as is', () => {
+    expect(new HttpError(404, 'nope').status).toBe(404)
+    expect(new HttpError(400, 'bad').status).toBe(400)
+    expect(new HttpError(599, 'edge').status).toBe(599)
+  })
+
+  it.each([99, 200, 204, 399, 600, 700, Number.NaN, 404.5, Infinity, -1])(
+    'normalizes the invalid status %s to 500',
+    (status) => {
+      expect(new HttpError(status, 'x').status).toBe(500)
+    },
+  )
+
+  it('never makes errorResponse throw on an invalid status', async () => {
+    const res = errorResponse(new HttpError(204, 'no content'))
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'no content' })
+  })
 })
 
 describe('errorResponse', () => {
@@ -26,7 +45,28 @@ describe('errorResponse', () => {
     const res = errorResponse(boom)
     expect(res.status).toBe(500)
     expect(await res.json()).toEqual({ error: 'internal' })
-    expect(log).toHaveBeenCalledWith(boom)
+    expect(log).toHaveBeenCalledTimes(1)
+    const args = log.mock.calls[0]
+    expect(args).not.toContain(boom)
+    expect(args[1]).toEqual({ name: 'Error', message: 'db password is hunter2', stack: boom.stack })
+    log.mockRestore()
+  })
+
+  it('does not dump extra properties of the error (request headers, tokens) into the log', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const leaky = Object.assign(new Error('upstream failed'), {
+      request: { headers: { authorization: 'Bearer SECRET-TOKEN' } },
+    })
+    errorResponse(leaky)
+    expect(JSON.stringify(log.mock.calls)).not.toContain('SECRET-TOKEN')
+    log.mockRestore()
+  })
+
+  it('logs a non-Error value as a string message', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    errorResponse('just a string')
+    expect(log.mock.calls[0][1]).toEqual({ name: 'NonError', message: 'just a string' })
+    log.mockRestore()
   })
 
   it('treats thrown non-Error values as internal errors', async () => {

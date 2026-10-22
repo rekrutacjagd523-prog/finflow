@@ -60,4 +60,22 @@ describe('ebFetch', () => {
     await expect(ebFetch('/api/other')).rejects.toThrow('ebFetch: only /api/enablebanking/* paths are allowed')
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it.each([
+    '/api/enablebanking/../x',
+    '/api/enablebanking/a/../../other',
+    '/api/enablebanking/%2e%2e/x',
+    '/api/enablebanking/./x',
+    '//evil.example',
+    '/api/enablebanking//x',
+    '/api/enablebanking/a\\..\\x',
+  ])('rejects the path-traversal / double-slash path %s', async (path) => {
+    await expect(ebFetch(path)).rejects.toThrow('ebFetch: only /api/enablebanking/* paths are allowed')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('still allows "//" inside the query string', async () => {
+    await ebFetch('/api/enablebanking/institutions?next=https://x.test/a')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

@@ -253,7 +253,7 @@ export default function HomePage() {
               </div>
               <p className="text-sm text-black/28 dark:text-white/25 mb-8">або $290 / рік — економія 2 місяці</p>
               <ul className="space-y-3 mb-8">
-                {['Необмежені транзакції', 'Необмежені рахунки', 'Cash Flow + P&L + Баланс', 'Платіжний календар', 'Експорт CSV'].map((f) => (
+                {['Необмежені транзакції', 'Необмежена кількість рахунків', 'Cash Flow + P&L + Баланс', 'Платіжний календар', 'Експорт CSV'].map((f) => (
                   <li key={f} className="flex items-center gap-3 text-sm text-black/60 dark:text-white/60">
                     <Check className="w-3.5 h-3.5 text-[#00c896] shrink-0" />
                     {f}
@@ -288,7 +288,7 @@ export default function HomePage() {
               <span className="text-[#00c896]">сьогодні</span>
             </h2>
             <p className="text-black/42 dark:text-white/40 text-lg mb-10 leading-relaxed">
-              14 днів повного доступу. Налаштування за 4 хвилини.<br className="hidden md:block" />Без кредитної картки.
+              14 днів повного доступу. Швидке налаштування.<br className="hidden md:block" />Без кредитної картки.
             </p>
             <Link
               href="/register"

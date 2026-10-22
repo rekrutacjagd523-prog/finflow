@@ -27,9 +27,15 @@ export async function POST(req: Request) {
 
     await requireOrgMember(uid, orgId)
 
+    // In production the redirect URL must come from config, never from the (spoofable) request origin.
+    const configuredUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!configuredUrl && process.env.NODE_ENV === 'production') {
+      throw new HttpError(500, 'server not configured')
+    }
+    const appUrl = configuredUrl || new URL(req.url).origin
+
     const state = signEbState({ orgId, uid }, process.env.EB_STATE_SECRET!)
     const token = await createJwt()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
 
     const res = await fetch(`${BASE}/auth`, {
       method: 'POST',

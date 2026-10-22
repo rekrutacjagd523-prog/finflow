@@ -38,10 +38,17 @@ describe('GET /api/enablebanking/accounts', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('returns 401 for a forged ID token', async () => {
+    const res = await GET(accountsRequest({ sessionId: SESSION_ID, orgId: 'org-acme' }, 'token-forged'))
+    expect(res.status).toBe(401)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('returns 400 when sessionId is missing', async () => {
     const res = await GET(accountsRequest({ orgId: 'org-acme' }, 'token-alice'))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Missing sessionId' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('returns 400 when sessionId contains path characters', async () => {
@@ -54,6 +61,7 @@ describe('GET /api/enablebanking/accounts', () => {
     const res = await GET(accountsRequest({ sessionId: SESSION_ID }, 'token-alice'))
     expect(res.status).toBe(400)
     expect(await res.json()).toEqual({ error: 'Missing orgId' })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('returns 403 when the caller is not a member of the org', async () => {
