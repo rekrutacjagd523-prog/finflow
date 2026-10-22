@@ -46,6 +46,15 @@ describe('isOrgMember', () => {
     expect(isOrgMember({ members }, 'u1')).toBe(false)
   })
 
+  it('is false for __proto__ (own-key check, no prototype access)', () => {
+    expect(isOrgMember({ members: {} }, '__proto__')).toBe(false)
+    expect(isOrgMember(JSON.parse('{"members":{}}'), '__proto__')).toBe(false)
+  })
+
+  it('is true for a member whose value is null (pins Firestore `uid in members` key semantics)', () => {
+    expect(isOrgMember({ members: { u1: null } }, 'u1')).toBe(true)
+  })
+
   it('ignores inherited keys', () => {
     const members = Object.create({ u1: { role: 'owner' } }) as object
     expect(isOrgMember({ members }, 'u1')).toBe(false)
@@ -104,6 +113,43 @@ describe('requireUserFromBearer', () => {
     expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
   })
 
+  it.each([
+    'auth/id-token-expired',
+    'auth/id-token-revoked',
+    'auth/argument-error',
+    'auth/invalid-id-token',
+    'auth/user-disabled',
+    'auth/user-not-found',
+  ])('maps token-validity error %s to 401', async (code) => {
+    admin.verifyIdToken.mockRejectedValue(Object.assign(new Error('x'), { code }))
+
+    const err = await requireUserFromBearer(requestWithAuth('Bearer t')).catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
+  })
+
+  it.each([
+    ['an auth/internal-error', Object.assign(new Error('boom SECRET-BODY'), { code: 'auth/internal-error' }), 'auth/internal-error'],
+    ['a network error', Object.assign(new Error('getaddrinfo ENOTFOUND SECRET-BODY'), { code: 'ENOTFOUND' }), 'ENOTFOUND'],
+    ['an error without a code', new TypeError('fetch failed SECRET-BODY'), 'TypeError'],
+  ])('maps %s to 503, logging only the code or name', async (_label, failure, logged) => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    admin.verifyIdToken.mockRejectedValue(failure)
+
+    const err = await requireUserFromBearer(requestWithAuth('Bearer secret-token')).catch(
+      (e: unknown) => e,
+    )
+
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 503, message: 'auth unavailable' })
+    expect(log).toHaveBeenCalledWith('verifyIdToken failed', logged)
+    const dump = JSON.stringify(log.mock.calls)
+    expect(dump).not.toContain('SECRET-BODY')
+    expect(dump).not.toContain('secret-token')
+    log.mockRestore()
+  })
+
   it('does not mask a server configuration error as 401', async () => {
     admin.getAdmin.mockImplementation(() => {
       throw new HttpError(500, 'server not configured')
@@ -150,6 +196,14 @@ describe('requireOrgMember', () => {
   it.each([
     ['an empty orgId', ''],
     ['an orgId that is a path', 'org1/accounts/acc1'],
+    ['".."', '..'],
+    ['"."', '.'],
+    ['a/b', 'a/b'],
+    ['a reserved __x__ id', '__x__'],
+    ['an id with a newline', 'a\nb'],
+    ['a 2000-char id', 'x'.repeat(2000)],
+    ['a non-string', 123 as never],
+    ['null', null as never],
   ])('rejects %s with 403 without reading Firestore', async (_label, orgId) => {
     const err = await requireOrgMember('u1', orgId).catch((e: unknown) => e)
 

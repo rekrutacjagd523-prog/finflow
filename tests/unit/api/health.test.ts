@@ -30,6 +30,7 @@ describe('GET /api/health', () => {
     expect(admin.get).toHaveBeenCalledTimes(1)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true, region: 'local', firestore: 'ok' })
+    expect(res.headers.get('cache-control')).toBe('no-store')
   })
 
   it('reports the Vercel function region when deployed', async () => {
@@ -48,6 +49,7 @@ describe('GET /api/health', () => {
 
     expect(res.status).toBe(500)
     expect(await res.json()).toEqual({ error: 'internal' })
+    expect(res.headers.get('cache-control')).toBe('no-store')
     expect(log).toHaveBeenCalled()
   })
 
@@ -60,5 +62,6 @@ describe('GET /api/health', () => {
 
     expect(res.status).toBe(500)
     expect(await res.json()).toEqual({ error: 'server not configured' })
+    expect(res.headers.get('cache-control')).toBe('no-store')
   })
 })
