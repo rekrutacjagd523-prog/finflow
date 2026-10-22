@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # The job id "ci" is the required status check on master (Task E7). Do not rename it.
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      # Dummy, public-shaped config for the emulator-only demo project. These are not secrets.
+      NEXT_PUBLIC_FIREBASE_API_KEY: demo-api-key
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: demo-finflow.firebaseapp.com
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-finflow
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-finflow.appspot.com
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '000000000000'
+      NEXT_PUBLIC_FIREBASE_APP_ID: '1:000000000000:web:0000000000000000'
+      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-DEMO000000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Java 21 (Firestore emulator)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Firebase emulator binaries
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}-firebase-tools-15
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools@15
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Firestore rules tests (emulator)
+        run: npm run test:rules
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E smoke (next dev + Auth/Firestore emulators)
+        env:
+          NEXT_PUBLIC_USE_EMULATORS: '1'
+          EB_STATE_SECRET: ci-e2e-only-state-secret
+        run: firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload Playwright report and emulator logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+            firebase-debug.log
+            firestore-debug.log
+          retention-days: 7
+          if-no-files-found: ignore
