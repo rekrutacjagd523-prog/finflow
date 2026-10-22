@@ -33,6 +33,7 @@ service cloud.firestore {
     function isValidNewOrg() {
       let org = request.resource.data;
       return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
         && org.keys().hasOnly(['name', 'currency', 'ownerId', 'plan', 'trialEndsAt', 'createdAt', 'members'])
         && org.ownerId == request.auth.uid
         && org.members is map
@@ -40,7 +41,22 @@ service cloud.firestore {
         && org.members[request.auth.uid] == {'role': 'owner'}
         && org.plan == 'trial'
         && org.trialEndsAt is timestamp
-        && org.trialEndsAt <= request.time + duration.value(15, 'd');
+        && org.trialEndsAt <= request.time + duration.value(15, 'd')
+        && orgFieldsValid(org)
+        && org.createdAt is timestamp
+        && org.createdAt >= request.time - duration.value(1, 'd')
+        && org.createdAt <= request.time + duration.value(1, 'd');
+    }
+
+    // Type and size checks for the fields a member may edit (and the creator sets).
+    function orgFieldsValid(o) {
+      return o.name is string && o.name.size() > 0 && o.name.size() <= 120
+        && o.currency is string && o.currency.size() == 3;
+    }
+
+    // A subcollection document may carry an `orgId`, but only its own org's.
+    function orgIdMatchesPath(orgId) {
+      return !('orgId' in request.resource.data) || request.resource.data.orgId == orgId;
     }
 
     match /organizations/{orgId} {
@@ -54,17 +70,22 @@ service cloud.firestore {
 
       allow create: if isValidNewOrg();
 
-      // Members may edit name/currency etc., but never membership, ownership
-      // or billing fields (no privilege escalation, no self-extended trial).
+      // Allow-list: a member may change only name and currency (the settings
+      // page). Everything else (membership, ownership, billing, createdAt and
+      // any unknown field) is closed, and the editable fields stay well-typed.
       allow update: if isMemberOf(resource.data)
-        && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['members', 'ownerId', 'plan', 'trialEndsAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'currency'])
+        && orgFieldsValid(request.resource.data);
 
       allow delete: if false;
 
       match /{subcollection}/{docId} {
-        allow read, write: if subcollection in ['accounts', 'categories', 'transactions', 'bankConnections']
+        allow read, delete: if subcollection in ['accounts', 'categories', 'transactions', 'bankConnections']
           && isMemberOf(orgData(orgId));
+
+        allow create, update: if subcollection in ['accounts', 'categories', 'transactions', 'bankConnections']
+          && isMemberOf(orgData(orgId))
+          && orgIdMatchesPath(orgId);
       }
     }
 

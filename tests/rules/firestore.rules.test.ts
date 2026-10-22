@@ -12,7 +12,9 @@ import {
   Timestamp,
   addDoc,
   collection,
+  collectionGroup,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -40,6 +42,14 @@ function fs(ctx: RulesTestContext): Firestore {
 }
 const anon = () => fs(testEnv.unauthenticatedContext())
 const alice = () => fs(testEnv.authenticatedContext('alice'))
+// A signed-in user whose ID token carries the given Firebase sign-in provider.
+const asProvider = (uid: string, signInProvider: string) =>
+  fs(
+    testEnv.authenticatedContext(uid, {
+      // The SDK types sign_in_provider as a closed union; cast to keep the helper generic.
+      firebase: { sign_in_provider: signInProvider as 'anonymous', identities: {} },
+    }),
+  )
 
 // Same shape as lib/firebase/firestore.ts#createOrganization.
 function newOrg(uid: string, overrides: Record<string, unknown> = {}) {
@@ -176,6 +186,64 @@ describe('organization create', () => {
       addDoc(collection(alice(), 'organizations'), newOrg('alice', { stripeCustomerId: 'cus_x' })),
     )
   })
+
+  it('rejects an anonymous Firebase user', async () => {
+    await assertFails(addDoc(collection(asProvider('alice', 'anonymous'), 'organizations'), newOrg('alice')))
+  })
+
+  it.each(['password', 'google.com'])('allows a %s user', async (provider) => {
+    await assertSucceeds(addDoc(collection(asProvider('alice', provider), 'organizations'), newOrg('alice')))
+  })
+
+  it('rejects a 900 KB name', async () => {
+    await assertFails(addDoc(collection(alice(), 'organizations'), newOrg('alice', { name: 'x'.repeat(900_000) })))
+  })
+
+  it('rejects an empty or non-string name', async () => {
+    await assertFails(addDoc(collection(alice(), 'organizations'), newOrg('alice', { name: '' })))
+    await assertFails(addDoc(collection(alice(), 'organizations'), newOrg('alice', { name: { a: 1 } })))
+  })
+
+  it('rejects a non-string or wrong-length currency', async () => {
+    await assertFails(addDoc(collection(alice(), 'organizations'), newOrg('alice', { currency: 980 })))
+    await assertFails(addDoc(collection(alice(), 'organizations'), newOrg('alice', { currency: 'UAHX' })))
+  })
+
+  it('rejects a createdAt that is not a timestamp or is far from now', async () => {
+    await assertFails(addDoc(collection(alice(), 'organizations'), newOrg('alice', { createdAt: '2026-01-01' })))
+    await assertFails(
+      addDoc(collection(alice(), 'organizations'), newOrg('alice', { createdAt: Timestamp.fromDate(new Date('2100-01-01')) })),
+    )
+    await assertFails(
+      addDoc(collection(alice(), 'organizations'), newOrg('alice', { createdAt: Timestamp.fromDate(new Date('2000-01-01')) })),
+    )
+  })
+
+  it('allows trialEndsAt at +15 days and rejects +15 days and 2 hours', async () => {
+    const DAY = 24 * 60 * 60 * 1000
+    await assertSucceeds(
+      addDoc(collection(alice(), 'organizations'), newOrg('alice', { trialEndsAt: Timestamp.fromMillis(Date.now() + 15 * DAY) })),
+    )
+    await assertFails(
+      addDoc(
+        collection(alice(), 'organizations'),
+        newOrg('alice', { trialEndsAt: Timestamp.fromMillis(Date.now() + 15 * DAY + 2 * 60 * 60 * 1000) }),
+      ),
+    )
+  })
+
+  it('rejects an empty members map and a role map with extra keys', async () => {
+    await assertFails(addDoc(collection(alice(), 'organizations'), newOrg('alice', { members: {} })))
+    await assertFails(
+      addDoc(collection(alice(), 'organizations'), newOrg('alice', { members: { alice: { role: 'owner', extra: 1 } } })),
+    )
+  })
+
+  it('cannot take over an existing foreign org id, with or without merge', async () => {
+    await assertFails(setDoc(doc(alice(), 'organizations/orgB'), newOrg('alice')))
+    await assertFails(setDoc(doc(alice(), 'organizations/orgB'), newOrg('alice'), { merge: true }))
+    await assertFails(setDoc(doc(alice(), 'organizations/orgB'), { members: { alice: { role: 'owner' } } }, { merge: true }))
+  })
 })
 
 describe('organization read, update and delete by its member', () => {
@@ -203,6 +271,33 @@ describe('organization read, update and delete by its member', () => {
     await assertFails(updateDoc(doc(alice(), 'organizations/orgA'), { trialEndsAt: later }))
     await assertFails(updateDoc(doc(alice(), 'organizations/orgA'), { ownerId: 'bob' }))
     await assertFails(updateDoc(doc(alice(), 'organizations/orgA'), { name: 'ok', plan: 'pro' }))
+  })
+
+  it.each([
+    ['stripeCustomerId', { stripeCustomerId: 'x' }],
+    ['createdAt', { createdAt: 'x' }],
+    ['name plus createdAt', { name: 'ok', createdAt: 'x' }],
+    ['deleting currency', { currency: deleteField() }],
+    ['a 5000 character name', { name: 'x'.repeat(5000) }],
+    ['an empty name', { name: '' }],
+    ['a non-string name', { name: 123 }],
+    ['a 4 letter currency', { currency: 'EURO' }],
+    ['a nested members role', { 'members.alice.role': 'admin' }],
+    ['removing own membership', { 'members.alice': deleteField() }],
+    ['deleting members', { members: deleteField() }],
+    ['deleting plan', { plan: deleteField() }],
+  ])('member cannot update org with %s', async (_label, data) => {
+    await assertFails(updateDoc(doc(alice(), 'organizations/orgA'), data))
+  })
+
+  it('member cannot add a member through a merge set', async () => {
+    await assertFails(
+      setDoc(doc(alice(), 'organizations/orgA'), { members: { bob: { role: 'owner' } } }, { merge: true }),
+    )
+  })
+
+  it('member can update name and currency together', async () => {
+    await assertSucceeds(updateDoc(doc(alice(), 'organizations/orgA'), { name: 'New', currency: 'EUR' }))
   })
 
   it('member cannot delete own org', async () => {
@@ -233,10 +328,50 @@ describe('owner subcollections', () => {
     await assertSucceeds(getDocs(q))
   })
 
+  it.each(['accounts', 'categories', 'transactions'] as const)('%s: orgId must match the path org', async (sub) => {
+    const db = alice()
+    await assertFails(setDoc(doc(db, `organizations/orgA/${sub}/x1`), { orgId: 'orgB', name: 'x' }))
+    await assertFails(addDoc(collection(db, `organizations/orgA/${sub}`), { orgId: 'orgB', name: 'x' }))
+    await assertFails(updateDoc(doc(db, `organizations/orgA/${sub}/seed`), { orgId: 'orgB' }))
+    await assertFails(setDoc(doc(db, `organizations/orgA/${sub}/seed`), { orgId: 'orgB', name: 'x' }))
+    // The client always writes orgId = path org; a doc without orgId stays allowed.
+    await assertSucceeds(setDoc(doc(db, `organizations/orgA/${sub}/x2`), { orgId: 'orgA', name: 'x' }))
+    await assertSucceeds(setDoc(doc(db, `organizations/orgA/${sub}/x3`), { name: 'no orgId' }))
+  })
+
+  it('cannot write into a subcollection of a non-existent org', async () => {
+    await assertFails(setDoc(doc(alice(), 'organizations/ghost/transactions/t1'), { orgId: 'ghost' }))
+    await assertFails(getDocs(collection(alice(), 'organizations/ghost/transactions')))
+  })
+
+  it.each(['transactions', 'accounts'] as const)('cannot run a collectionGroup query on %s', async (sub) => {
+    await assertFails(getDocs(collectionGroup(alice(), sub)))
+  })
+
   it('owner cannot use subcollections outside the allow-list or nested deeper', async () => {
     await assertFails(setDoc(doc(alice(), 'organizations/orgA/secrets/x'), { a: 1 }))
     await assertFails(getDoc(doc(alice(), 'organizations/orgA/secrets/x')))
     await assertFails(setDoc(doc(alice(), 'organizations/orgA/accounts/seed/history/h1'), { a: 1 }))
+  })
+})
+
+describe('organization list queries', () => {
+  it('cannot run a collectionGroup query on organizations', async () => {
+    await assertFails(getDocs(collectionGroup(alice(), 'organizations')))
+  })
+
+  it('allows the membership filter combined with another where', async () => {
+    const q = query(
+      collection(alice(), 'organizations'),
+      where('members.alice.role', '!=', null),
+      where('currency', '==', 'UAH'),
+    )
+    const snap = await assertSucceeds(getDocs(q))
+    expect(snap.docs.map((d) => d.id)).toEqual(['orgA'])
+  })
+
+  it('cannot list with orderBy alone', async () => {
+    await assertFails(getDocs(query(collection(alice(), 'organizations'), orderBy('name'))))
   })
 })
 
