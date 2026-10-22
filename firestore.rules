@@ -1,9 +1,75 @@
 rules_version = '2';
 
-// Placeholder: deny everything. Replaced by the real rules in Task D2.
+// FinFlow Firestore security rules (S00).
+//
+// Deny by default: any path that no `match` block below allows is closed to
+// web/mobile clients. Server code (firebase-admin in lib/server) bypasses these
+// rules entirely.
+//
+// Data shape (lib/firebase/firestore.ts#createOrganization):
+//   organizations/{orgId} {
+//     name, currency, ownerId, plan, trialEndsAt, createdAt,
+//     members: { <uid>: { role: 'owner' } }
+//   }
+//   organizations/{orgId}/{accounts|categories|transactions|bankConnections}/{docId}
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // True when the caller's uid is a key of the org's `members` map.
+    function isMemberOf(org) {
+      return isSignedIn() && request.auth.uid in org.members;
+    }
+
+    function orgData(orgId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)).data;
+    }
+
+    // Exactly what createOrganization writes: the caller is the only member and
+    // the owner, the plan is a trial of at most 14 days (+1 day clock skew).
+    function isValidNewOrg() {
+      let org = request.resource.data;
+      return isSignedIn()
+        && org.keys().hasOnly(['name', 'currency', 'ownerId', 'plan', 'trialEndsAt', 'createdAt', 'members'])
+        && org.ownerId == request.auth.uid
+        && org.members is map
+        && org.members.keys().hasOnly([request.auth.uid])
+        && org.members[request.auth.uid] == {'role': 'owner'}
+        && org.plan == 'trial'
+        && org.trialEndsAt is timestamp
+        && org.trialEndsAt <= request.time + duration.value(15, 'd');
+    }
+
+    match /organizations/{orgId} {
+      allow get: if isMemberOf(resource.data);
+
+      // Rules are not filters: a query is allowed only if it can never return
+      // an org the caller is not a member of. The client query
+      // where(`members.${uid}.role`, '!=', null) (lib/firebase/queries.ts)
+      // satisfies this; an unfiltered query or one on another uid is denied.
+      allow list: if isSignedIn() && resource.data.members[request.auth.uid].role != null;
+
+      allow create: if isValidNewOrg();
+
+      // Members may edit name/currency etc., but never membership, ownership
+      // or billing fields (no privilege escalation, no self-extended trial).
+      allow update: if isMemberOf(resource.data)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['members', 'ownerId', 'plan', 'trialEndsAt']);
+
+      allow delete: if false;
+
+      match /{subcollection}/{docId} {
+        allow read, write: if subcollection in ['accounts', 'categories', 'transactions', 'bankConnections']
+          && isMemberOf(orgData(orgId));
+      }
+    }
+
+    // Server-only documents (e.g. _meta/health read by GET /api/health).
+    match /_meta/{document=**} {
       allow read, write: if false;
     }
   }
