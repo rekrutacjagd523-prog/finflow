@@ -12,6 +12,7 @@ import {
   deleteBankConnection,
   type BankConnection,
 } from '@/lib/firebase/bankConnections'
+import { ebFetch } from '@/lib/enablebanking/client'
 
 interface Institution {
   id: string
@@ -76,8 +77,9 @@ export default function EnableBankingConnect({ orgId }: Props) {
   const loadInstitutions = async (c: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/enablebanking/institutions?country=${c}`)
+      const res = await ebFetch(`/api/enablebanking/institutions?country=${encodeURIComponent(c)}`)
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
       setInstitutions(data.institutions ?? [])
     } catch { toast.error('Не вдалось завантажити банки') }
     finally { setLoading(false) }
@@ -96,13 +98,13 @@ export default function EnableBankingConnect({ orgId }: Props) {
   const handleConnect = async (inst: Institution) => {
     setConnecting(true)
     try {
-      const res = await fetch('/api/enablebanking/session', {
+      const res = await ebFetch('/api/enablebanking/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aspspName: inst.id, country: inst.country, orgId }),
+        body: JSON.stringify({ aspspName: inst.id, aspspCountry: inst.country, orgId }),
       })
       const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`)
       sessionStorage.setItem('eb_pending', JSON.stringify({ name: inst.name, authorizationId: data.authorizationId }))
       window.location.href = data.url
     } catch (e) {

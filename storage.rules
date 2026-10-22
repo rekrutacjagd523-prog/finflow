@@ -1,0 +1,10 @@
+rules_version = '2';
+
+// FinFlow does not use Cloud Storage for Firebase. Deny every client request.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
