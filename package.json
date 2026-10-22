@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:server-imports": "node scripts/check-server-imports.mjs",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:rules": "firebase emulators:exec --only firestore --project demo-finflow \"vitest run --config vitest.rules.config.ts\"",
     "test:e2e": "playwright test"
