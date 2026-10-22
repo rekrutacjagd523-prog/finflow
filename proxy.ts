@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server'
 const PUBLIC_PATHS = ['/login', '/register', '/forgot-password']
 const AUTH_PATHS = ['/login', '/register']
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Get Firebase auth token from cookie (set by client-side auth)

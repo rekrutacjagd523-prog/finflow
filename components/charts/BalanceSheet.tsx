@@ -225,7 +225,7 @@ export default function BalanceSheet({ accounts, orgId = 'default', loading }: B
       {/* ======= LIABILITIES ======= */}
       <div className="rounded-xl border border-[#e5e7eb] bg-white p-5 space-y-1">
         <div className="flex items-center justify-between pb-3 border-b border-[#e5e7eb]">
-          <h3 className="text-sm font-bold text-[#111111] uppercase tracking-wide">Зобов'язання</h3>
+          <h3 className="text-sm font-bold text-[#111111] uppercase tracking-wide">Зобов’язання</h3>
           <span className="text-sm font-bold text-[#6366f1]">{formatNum(totalLiabilities)} €</span>
         </div>
 
@@ -241,7 +241,7 @@ export default function BalanceSheet({ accounts, orgId = 'default', loading }: B
 
         {/* Total */}
         <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-[#111111]">
-          <span className="text-base font-bold text-[#111111]">Всього зобов'язання</span>
+          <span className="text-base font-bold text-[#111111]">Всього зобов’язання</span>
           <span className="text-base font-bold text-[#6366f1]">{formatNum(totalLiabilities)} €</span>
         </div>
 

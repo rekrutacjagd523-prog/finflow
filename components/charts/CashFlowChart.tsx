@@ -25,13 +25,23 @@ function formatNumber(n: number): string {
   }).format(n)
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomTooltip({ active, payload, label }: any) {
+interface TooltipEntry {
+  dataKey?: string | number
+  value?: number | string
+}
+
+interface CustomTooltipProps {
+  active?: boolean
+  payload?: TooltipEntry[]
+  label?: string | number
+}
+
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   if (!active || !payload?.length) return null
 
-  const income = (payload.find((p: any) => p.dataKey === 'income')?.value as number) ?? 0
-  const expense = (payload.find((p: any) => p.dataKey === 'expense')?.value as number) ?? 0
-  const net = (income as number) - (expense as number)
+  const income = Number(payload.find((p) => p.dataKey === 'income')?.value ?? 0)
+  const expense = Number(payload.find((p) => p.dataKey === 'expense')?.value ?? 0)
+  const net = income - expense
 
   return (
     <div className="rounded-xl border border-[#e5e7eb] bg-white p-3 shadow-lg text-sm">
