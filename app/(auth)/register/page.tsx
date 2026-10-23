@@ -37,6 +37,20 @@ export default function RegisterPage() {
   const [currency, setCurrency] = useState('UAH')
   const [loading, setLoading] = useState(false)
 
+  // OrgProvider's own load started when the user appeared, before a new org existed, so load the
+  // org explicitly. The account, org and session already exist at this point: if that load fails,
+  // still leave, with a full page load that rebuilds the org state from scratch.
+  const goToOrg = async (orgId: string) => {
+    const ok = await switchOrg(orgId).then(() => true, () => false)
+    if (ok) {
+      router.push(`/${orgId}/transactions`)
+    } else {
+      // Deliberately a full page load (not router.push): it must rebuild the org state.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/${orgId}/transactions`)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name || !email || !password || !orgName) return
@@ -44,9 +58,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { orgId } = await signUp(email, password, name, orgName, currency)
-      // OrgProvider's own load started when the user appeared, before this org existed.
-      await switchOrg(orgId)
-      router.push(`/${orgId}/transactions`)
+      await goToOrg(orgId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed'
       toast.error(message)
@@ -65,13 +77,11 @@ export default function RegisterPage() {
       const { user } = await signInGoogle()
       const existingOrgs = await getUserOrganizations(user.uid)
       if (existingOrgs.length > 0) {
-        await switchOrg(existingOrgs[0].id)
-        router.push(`/${existingOrgs[0].id}/transactions`)
+        await goToOrg(existingOrgs[0].id)
         return
       }
       const orgId = await createOrganization(user.uid, orgName, currency)
-      await switchOrg(orgId)
-      router.push(`/${orgId}/transactions`)
+      await goToOrg(orgId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Google registration failed'
       toast.error(message)

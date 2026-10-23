@@ -14,18 +14,19 @@ async function waitForHydration(page: Page, selector: string): Promise<void> {
   }, selector)
 }
 
-async function registerViaUi(page: Page): Promise<{ email: string; orgId: string }> {
+async function registerViaUi(page: Page): Promise<{ email: string; orgId: string; companyName: string }> {
   const runId = `${Date.now()}${Math.floor(Math.random() * 1000)}`
   const email = `session-${runId}@finflow.test`
+  const companyName = `Session Co ${runId}`
   await page.goto('/register')
   await waitForHydration(page, '#name')
   await page.getByLabel('Your name', { exact: true }).fill('Session Tester')
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
-  await page.getByLabel('Company name', { exact: true }).fill(`Session Co ${runId}`)
+  await page.getByLabel('Company name', { exact: true }).fill(companyName)
   await page.getByRole('button', { name: 'Try 14 days free' }).click()
   await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
-  return { email, orgId: new URL(page.url()).pathname.split('/')[1] }
+  return { email, orgId: new URL(page.url()).pathname.split('/')[1], companyName }
 }
 
 /** Fills the login form on the page that is already open (keeps its ?redirect=). */
@@ -63,6 +64,7 @@ test.describe('server session (emulators)', () => {
     })
     expect(forged.status()).toBe(401)
     expect((await request.get('/api/enablebanking/institutions?country=PL', { headers: { Cookie: '__session=1' } })).status()).toBe(401)
+    expect((await request.get('/api/enablebanking/institutions?country=PL')).status()).toBe(401)
   })
 
   test('/api/auth/session refuses a bad Origin, a missing Origin and a garbage token', async ({ request }) => {
@@ -90,7 +92,9 @@ test.describe('server session (emulators)', () => {
 
     // (b) An app page: the proxy accepts the cookie, the AuthProvider finds no SDK user, clears the
     // session and sends the visitor to /login with the return path.
-    await page.goto('/some-org/transactions')
+    const res = await page.goto('/some-org/transactions')
+    // The first response is the app page itself (no proxy redirect): the server accepted the cookie.
+    expect(res?.url()).toMatch(/\/some-org\/transactions$/)
     await page.waitForURL(/\/login\?redirect=%2Fsome-org%2Ftransactions$/)
     await expect
       .poll(async () => (await context.cookies()).find((c) => c.name === '__session'))
@@ -98,7 +102,7 @@ test.describe('server session (emulators)', () => {
   })
 
   test('registration sets an HttpOnly session cookie; unverified email gates the bank; verifying lifts the gate; cross-origin POST is refused', async ({ page, request }) => {
-    const { email } = await registerViaUi(page)
+    const { email, companyName } = await registerViaUi(page)
 
     // The cookie is a real, script-invisible session (not the old "1").
     const cookie = (await page.context().cookies()).find((c) => c.name === '__session')
@@ -128,6 +132,9 @@ test.describe('server session (emulators)', () => {
     // (the request now fails later, on membership of the foreign org).
     await verifyEmailInEmulator(request, email)
     await page.reload()
+    // The company name renders only once the SDK user AND the org are loaded, so "banner gone"
+    // below cannot pass merely because the user has not been restored yet.
+    await expect(page.locator('aside').getByText(companyName, { exact: true })).toBeVisible()
     await expect(page.getByTestId('verify-email-banner')).toHaveCount(0)
     const verified = await page.context().request.post('/api/enablebanking/session', {
       headers: { Origin: ORIGIN },
