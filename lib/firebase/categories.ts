@@ -5,43 +5,27 @@ import {
   addDoc,
   getDocs,
   serverTimestamp,
+  setDoc,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { buildDefaultCategories } from './default-categories'
 import type { Category } from '@/types'
 
 function categoriesRef(orgId: string) {
   return collection(db, 'organizations', orgId, 'categories')
 }
 
-const DEFAULT_INCOME_CATEGORIES = [
-  { name: 'Продажі', color: '#22c55e' },
-  { name: 'Послуги', color: '#16a34a' },
-  { name: 'Інвестиції', color: '#4ade80' },
-  { name: 'Інше (дохід)', color: '#86efac' },
-]
-
-const DEFAULT_EXPENSE_CATEGORIES = [
-  { name: 'Зарплата', color: '#ef4444' },
-  { name: 'Оренда', color: '#dc2626' },
-  { name: 'Маркетинг', color: '#f87171' },
-  { name: 'Комунальні', color: '#fca5a5' },
-  { name: 'Обладнання', color: '#fb923c' },
-  { name: 'Податки', color: '#f97316' },
-  { name: 'Інше (витрата)', color: '#fdba74' },
-]
-
+// Idempotent: the check below is only an optimisation. Every default has a deterministic document
+// id (buildDefaultCategories), so two concurrent seeds (StrictMode double effects, two tabs) both
+// see an empty collection but write the same documents instead of adding duplicates.
 export async function seedDefaultCategories(orgId: string): Promise<void> {
   const snap = await getDocs(categoriesRef(orgId))
   if (!snap.empty) return
 
-  const all = [
-    ...DEFAULT_INCOME_CATEGORIES.map((c) => ({ ...c, type: 'income' as const })),
-  ]
-
   await Promise.all(
-    all.map((cat) =>
-      addDoc(categoriesRef(orgId), {
+    buildDefaultCategories().map(({ id, ...cat }) =>
+      setDoc(doc(categoriesRef(orgId), id), {
         ...cat,
         orgId,
         createdAt: serverTimestamp(),
