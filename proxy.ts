@@ -1,19 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { isAppPath, safeRedirectPath } from '@/lib/auth/paths'
-import { isSessionCookieValid } from '@/lib/server/auth'
-import { SESSION_COOKIE_NAME, isSecureCookieEnv } from '@/lib/server/session-cookie'
+import { errorKind, isSessionCookieValid } from '@/lib/server/auth'
+import { SESSION_COOKIE_NAME, buildClearedSessionCookie } from '@/lib/server/session-cookie'
 
 function withClearedSession(res: NextResponse): NextResponse {
-  res.cookies.set({
-    name: SESSION_COOKIE_NAME,
-    value: '',
-    path: '/',
-    maxAge: 0,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: isSecureCookieEnv(),
-  })
+  res.headers.append('Set-Cookie', buildClearedSessionCookie())
   return res
 }
 
@@ -32,9 +24,13 @@ export async function proxy(request: NextRequest) {
   if (cookie) {
     try {
       if (await isSessionCookieValid(cookie)) return NextResponse.next()
-    } catch {
+    } catch (e) {
       // Our auth backend failed: do not log everybody out, and do not let anyone in either.
-      return new NextResponse('Authentication service unavailable', { status: 503 })
+      console.error('proxy: session check failed', errorKind(e))
+      return new NextResponse('Authentication service unavailable', {
+        status: 503,
+        headers: { 'Cache-Control': 'no-store', 'Retry-After': '5' },
+      })
     }
   }
 
@@ -42,6 +38,7 @@ export async function proxy(request: NextRequest) {
   const back = safeRedirectPath(pathname + search)
   if (back) loginUrl.searchParams.set('redirect', back)
   const res = NextResponse.redirect(loginUrl)
+  res.headers.set('Cache-Control', 'no-store')
   return cookie ? withClearedSession(res) : res
 }
 

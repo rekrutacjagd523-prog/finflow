@@ -4,7 +4,10 @@ import { HttpError } from '@/lib/server/http-error'
 import { proxy } from '@/proxy'
 
 const auth = vi.hoisted(() => ({ isSessionCookieValid: vi.fn() }))
-vi.mock('@/lib/server/auth', () => ({ isSessionCookieValid: auth.isSessionCookieValid }))
+vi.mock('@/lib/server/auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/server/auth')>()),
+  isSessionCookieValid: auth.isSessionCookieValid,
+}))
 
 function request(path: string, cookie?: string): NextRequest {
   return new NextRequest(`http://localhost:3000${path}`, {
@@ -38,8 +41,18 @@ describe('proxy: app pages', () => {
     expect(auth.isSessionCookieValid).toHaveBeenCalledWith('1')
     expect(res.status).toBe(307)
     expect(res.headers.get('location')).toContain('/login?redirect=%2Forg1%2Ftransactions')
-    expect(res.headers.get('set-cookie')).toMatch(/__session=;/)
-    expect(res.headers.get('set-cookie')).toMatch(/Max-Age=0/)
+    expect(res.headers.get('set-cookie')).toBe('__session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax')
+    expect(res.headers.get('cache-control')).toBe('no-store')
+  })
+
+  it('redirects to plain /login when the original path is not a safe return path', async () => {
+    const res = await proxy(request('/org1/transactions?x=' + 'a'.repeat(600)))
+
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toBe('http://localhost:3000/login')
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('set-cookie')).toBeNull()
+    expect(auth.isSessionCookieValid).not.toHaveBeenCalled()
   })
 
   it('lets a valid session through', async () => {
@@ -57,7 +70,21 @@ describe('proxy: app pages', () => {
     const res = await proxy(request('/org1/settings', 'good'))
 
     expect(res.status).toBe(503)
+    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('retry-after')).toBe('5')
     expect(res.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('also answers 503 when the server is not configured, and logs only a kind', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    auth.isSessionCookieValid.mockRejectedValue(new HttpError(500, 'server not configured'))
+
+    const res = await proxy(request('/org1/settings', 'good'))
+
+    expect(res.status).toBe(503)
+    expect(res.headers.get('set-cookie')).toBeNull()
+    expect(logged).toHaveBeenCalledWith('proxy: session check failed', expect.any(String))
+    expect(JSON.stringify(logged.mock.calls)).not.toContain('server not configured')
   })
 })
 
@@ -70,8 +97,6 @@ describe('proxy: auth pages', () => {
   }
 
   it.each(cases)('passes %s through untouched with %s', async (path, _label, cookie) => {
-    auth.isSessionCookieValid.mockImplementation(async (value: string) => value === 'good')
-
     const res = await proxy(request(path, cookie))
 
     expect(isNext(res)).toBe(true)
