@@ -13,7 +13,7 @@ const fetchMock = vi.fn()
 function institutionsRequest(country: string | null, token?: string): Request {
   const url = new URL('http://localhost:3000/api/enablebanking/institutions')
   if (country !== null) url.searchParams.set('country', country)
-  return new Request(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  return new Request(url, { headers: token ? { Cookie: `__session=${token}` } : {} })
 }
 
 describe('GET /api/enablebanking/institutions', () => {
@@ -31,13 +31,13 @@ describe('GET /api/enablebanking/institutions', () => {
     vi.unstubAllGlobals()
   })
 
-  it('returns 401 without an Authorization header', async () => {
+  it('returns 401 without a session cookie', async () => {
     const res = await GET(institutionsRequest('PL'))
     expect(res.status).toBe(401)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('returns 401 for an invalid ID token', async () => {
+  it('returns 401 for a forged session cookie', async () => {
     const res = await GET(institutionsRequest('PL', 'token-forged'))
     expect(res.status).toBe(401)
     expect(fetchMock).not.toHaveBeenCalled()

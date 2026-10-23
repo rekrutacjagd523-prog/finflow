@@ -14,7 +14,7 @@ const SESSION_ID = '3f1c9a52-7d0e-4b8e-9a6f-0c2d4e5f6a7b'
 function accountsRequest(query: Record<string, string>, token?: string): Request {
   const url = new URL('http://localhost:3000/api/enablebanking/accounts')
   for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
-  return new Request(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  return new Request(url, { headers: token ? { Cookie: `__session=${token}` } : {} })
 }
 
 describe('GET /api/enablebanking/accounts', () => {
@@ -32,13 +32,13 @@ describe('GET /api/enablebanking/accounts', () => {
     vi.unstubAllGlobals()
   })
 
-  it('returns 401 without an Authorization header', async () => {
+  it('returns 401 without a session cookie', async () => {
     const res = await GET(accountsRequest({ sessionId: SESSION_ID, orgId: 'org-acme' }))
     expect(res.status).toBe(401)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('returns 401 for a forged ID token', async () => {
+  it('returns 401 for a forged session cookie', async () => {
     const res = await GET(accountsRequest({ sessionId: SESSION_ID, orgId: 'org-acme' }, 'token-forged'))
     expect(res.status).toBe(401)
     expect(fetchMock).not.toHaveBeenCalled()

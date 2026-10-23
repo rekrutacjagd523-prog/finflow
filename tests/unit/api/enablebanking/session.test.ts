@@ -17,9 +17,9 @@ vi.mock('@/lib/enablebanking/jwt', () => ({ createJwt: vi.fn(async () => 'eb-jwt
 
 const fetchMock = vi.fn()
 
-function sessionRequest(body: unknown, token?: string): Request {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers.Authorization = `Bearer ${token}`
+function sessionRequest(body: unknown, token?: string, origin = 'http://localhost:3000'): Request {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', Origin: origin }
+  if (token) headers.Cookie = `__session=${token}`
   return new Request('http://localhost:3000/api/enablebanking/session', {
     method: 'POST',
     headers,
@@ -47,16 +47,30 @@ describe('POST /api/enablebanking/session', () => {
     vi.unstubAllEnvs()
   })
 
-  it('returns 401 without an Authorization header and never calls Enable Banking', async () => {
+  it('returns 401 without a session cookie and never calls Enable Banking', async () => {
     const res = await POST(sessionRequest(VALID_BODY))
     expect(res.status).toBe(401)
     expect(typeof (await res.json()).error).toBe('string')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('returns 401 for an invalid ID token', async () => {
+  it('returns 401 for a forged session cookie', async () => {
     const res = await POST(sessionRequest(VALID_BODY, 'token-forged'))
     expect(res.status).toBe(401)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 email_not_verified for a signed-in user whose email is not verified', async () => {
+    const res = await POST(sessionRequest(VALID_BODY, 'token-bob'))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'email_not_verified' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 for a cross-origin request even with a valid session', async () => {
+    const res = await POST(sessionRequest(VALID_BODY, 'token-alice', 'https://evil.example'))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -115,7 +129,7 @@ describe('POST /api/enablebanking/session', () => {
       url: 'https://auth.enablebanking.com/ais/start?sessionid=73100c65',
       authorizationId: '73100c65-c54d-46a1-87d1-aa3effde435a',
     })
-    expect(fakeAdmin.auth.verifyIdToken).toHaveBeenCalledTimes(1)
+    expect(fakeAdmin.auth.verifySessionCookie).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('https://api.enablebanking.com/auth')

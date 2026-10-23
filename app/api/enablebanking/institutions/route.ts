@@ -1,5 +1,5 @@
 import { createJwt } from '@/lib/enablebanking/jwt'
-import { requireUserFromBearer } from '@/lib/server/auth'
+import { requireUser } from '@/lib/server/auth'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 
 export const runtime = 'nodejs'
@@ -10,10 +10,10 @@ const COUNTRY_RE = /^[A-Z]{2}$/
 type Aspsp = { name: string; country: string; logo?: string; bic?: string }
 
 // GET /api/enablebanking/institutions?country=PL
-// Requires `Authorization: Bearer <Firebase ID token>` (any signed-in user; no org data involved).
+// Requires a session cookie (any signed-in user; no org data involved).
 export async function GET(req: Request) {
   try {
-    await requireUserFromBearer(req)
+    await requireUser(req)
 
     const country = new URL(req.url).searchParams.get('country') ?? 'PL'
     if (!COUNTRY_RE.test(country)) throw new HttpError(400, 'invalid country')

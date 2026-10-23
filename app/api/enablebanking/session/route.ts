@@ -1,5 +1,5 @@
 import { createJwt } from '@/lib/enablebanking/jwt'
-import { requireOrgMember, requireUserFromBearer } from '@/lib/server/auth'
+import { requireOrgMember, requireVerifiedUser } from '@/lib/server/auth'
 import { signEbState } from '@/lib/server/eb-state'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 
@@ -10,10 +10,10 @@ const ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const COUNTRY_RE = /^[A-Z]{2}$/
 
 // POST /api/enablebanking/session  { aspspName, aspspCountry?, orgId }
-// Requires `Authorization: Bearer <Firebase ID token>` of a member of `orgId`.
+// Requires the session cookie of a user with a verified email who is a member of `orgId`.
 export async function POST(req: Request) {
   try {
-    const { uid } = await requireUserFromBearer(req)
+    const { uid } = await requireVerifiedUser(req)
 
     const body: unknown = await req.json().catch(() => null)
     const { aspspName, aspspCountry = 'PL', orgId } = (body ?? {}) as Record<string, unknown>
