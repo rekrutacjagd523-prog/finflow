@@ -207,6 +207,19 @@ test.describe('server session (emulators)', () => {
     expect(await alive.json()).toEqual({ error: 'email_not_verified' })
   })
 
+  test('settings ignores an eb_auth link that this tab did not start', async ({ page }) => {
+    const { orgId } = await registerViaUi(page)
+    const planted = Buffer.from(JSON.stringify({ sessionId: 'attacker-session' })).toString('base64url')
+
+    await page.goto(`/${orgId}/settings?eb_auth=${planted}`)
+
+    await expect(page.getByText('Підключення не підтверджено')).toBeVisible()
+    expect(new URL(page.url()).searchParams.has('eb_auth')).toBe(false)
+    // Nothing was saved: no connection row (it would be named "Банк" without a pending entry).
+    await expect(page.getByText('Банк', { exact: true })).toHaveCount(0)
+    await expect(page.getByText(/підключено$/)).toHaveCount(0)
+  })
+
   test('login ignores an off-site ?redirect= and honours the app return path after re-login', async ({ page }) => {
     const { email, orgId } = await registerViaUi(page)
     // Same second-granular revocation as above. Every later sign-in mints a NEW cookie whose
