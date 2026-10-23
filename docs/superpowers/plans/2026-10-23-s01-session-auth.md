@@ -2833,3 +2833,21 @@ After the user confirms production works: update `PROGRESS.md` (production verif
 **Placeholder scan:** no TBD/TODO; every code step has full code; the only conditional instructions are explicit contingencies (`server-only` in the proxy bundle, emulator revocation, unknown SDK error code) with the exact action to take.
 
 **Type consistency:** `SessionUser { uid, emailVerified }`, `requireUser`, `requireVerifiedUser`, `isSessionCookieValid`, `toAuthHttpError(e, operation)` (Task 4) are the names used in Tasks 5, 6, 9; `SESSION_COOKIE_NAME`, `SESSION_MAX_AGE_SECONDS`, `buildSessionCookie`, `buildClearedSessionCookie`, `readSessionCookie`, `isSecureCookieEnv` (Task 2) match Tasks 4, 5, 9; `assertSameOrigin` (Task 3) matches Tasks 4, 5; `establishSession`/`clearSession` (Task 8) match `auth.ts` and `useAuth.tsx`; `safeRedirectPath`/`isAppPath`/`isAuthPath` (Task 1) match Tasks 8, 9; fake-admin names `fakeTokens`, `fakeUnverified`, `fakeIdTokenAgeSec`, `fakeAdmin.auth.{verifyIdToken,verifySessionCookie,getUser,createSessionCookie,revokeRefreshTokens}` match Tasks 5, 6.
+
+---
+
+## Відхилення від плану під час виконання (2026-10-23)
+
+Що змінилося під час рев'ю й виконання проти тексту задач вище:
+
+- **Збій отримання ключів підпису Google → 503.** Admin SDK повідомляє його як `auth/argument-error`, неотличний від зіпсованої cookie за кодом; `isKeyFetchFailure` розпізнає його за фіксованим префіксом повідомлення, і `toAuthHttpError`/`isCredentialError` віддають 503, а не 401.
+- **Proxy пильнує лише сторінки застосунку.** `/login` і `/register` не перевіряються й не редіректяться (правило «валідна cookie на /login → /» відкинуто: пастка застарілої cookie). Збій перевірки на нашому боці — 503 без очищення cookie.
+- **`AuthProvider` дедуплікований:** один екземпляр у кореневому layout, вкладений у `(app)/layout.tsx` прибрано.
+- **`loginUrlAfterSessionLoss`** (`lib/auth/paths.ts`): куди вести браузер, коли зник користувач SDK (`/login` після виходу, інакше `/login?redirect=…`).
+- **Суворіший `safeRedirectPath`:** нормалізація й декодування URL, відхилення шляхів API, `//`, зворотних скісних рисок, керівних символів і сторінок автентифікації; `/login` поважає `redirect` лише коли є організація.
+- **`ebFetch` очищає сесію на 401** і веде на `/login?redirect=…` (інакше proxy, що не бачить відкликання, повертав би з `/login` назад).
+- **Шум у логах виходу:** хелпери `isCredentialError` і `errorKind`; відхилена cookie при виході не логується, інші збої логуються лише за кодом.
+- **`/api/auth/session`:** 413 для тіла понад 8 КБ, 415 для не-JSON, закритий при відсутньому чи нечисловому `auth_time` (401 `reauth_required`).
+- **Тест покриття роутів на кожен обробник**, а не лише на мутуючі методи (allow-list із причинами).
+- **Гонка організації:** `loadSeq` у `useOrg`, `switchOrg` через `auth.currentUser`, реєстрація викликає `switchOrg(orgId)` явно; лист підтвердження best-effort, текст банера не обіцяє, що лист надіслано.
+- **Додані тести крайніх випадків:** жива cookie без користувача SDK, open redirect і шлях повернення, межі розміру й типу тіла, відсутній `auth_time`, збій ключів підпису.
