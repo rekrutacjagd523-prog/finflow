@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { sendEmailVerification } from 'firebase/auth'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -15,15 +15,20 @@ export default function VerifyEmailBanner() {
   const [, rerender] = useState(0)
   const [sentAt, setSentAt] = useState<number | null>(null)
   const [sending, setSending] = useState(false)
+  // focus and visibilitychange often fire together; only one reload may be in flight.
+  const reloading = useRef<boolean>(false)
 
   // user.reload() updates the same User object in place, so force a render afterwards.
   const refresh = useCallback(async () => {
-    if (!user || user.emailVerified) return
+    if (!user || user.emailVerified || reloading.current) return
+    reloading.current = true
     try {
       await user.reload()
       rerender((n) => n + 1)
     } catch {
       // Offline or token problem: try again on the next focus.
+    } finally {
+      reloading.current = false
     }
   }, [user])
 
@@ -54,8 +59,12 @@ export default function VerifyEmailBanner() {
       await sendEmailVerification(user)
       setSentAt(Date.now())
       toast.success('Лист надіслано')
-    } catch {
-      toast.error('Не вдалося надіслати лист. Спробуйте пізніше.')
+    } catch (e) {
+      if ((e as { code?: string }).code === 'auth/too-many-requests') {
+        toast.error('Забагато спроб. Спробуйте за кілька хвилин.')
+      } else {
+        toast.error('Не вдалося надіслати лист. Спробуйте пізніше.')
+      }
     } finally {
       setSending(false)
     }
@@ -68,8 +77,8 @@ export default function VerifyEmailBanner() {
       className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900"
     >
       <p>
-        Підтвердіть email <strong>{user.email}</strong>, щоб підключати банки. Лист із посиланням уже в
-        вашій скриньці.
+        Підтвердіть email <strong>{user.email}</strong>, щоб підключати банки. Не отримали лист?
+        Надішліть його ще раз.
       </p>
       <Button type="button" variant="outline" size="sm" onClick={handleResend} disabled={sending}>
         {sending ? 'Надсилаємо…' : 'Надіслати лист ще раз'}
