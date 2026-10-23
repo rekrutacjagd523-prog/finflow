@@ -1,0 +1,191 @@
+import { test, expect, type Page } from '@playwright/test'
+import { createEmulatorUser, verifyEmailInEmulator } from './helpers/emulator-auth'
+
+const ORIGIN = 'http://localhost:3000'
+const PASSWORD = 'session-pass-123'
+const NEEDS_EMULATORS =
+  'Needs the Auth + Firestore emulators. Run: firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"'
+
+// Filling a controlled input before React hydrates loses the value, so wait for hydration.
+async function waitForHydration(page: Page, selector: string): Promise<void> {
+  await page.waitForFunction((sel) => {
+    const el = document.querySelector(sel)
+    return !!el && Object.keys(el).some((k) => k.startsWith('__reactProps$'))
+  }, selector)
+}
+
+async function registerViaUi(page: Page): Promise<{ email: string; orgId: string }> {
+  const runId = `${Date.now()}${Math.floor(Math.random() * 1000)}`
+  const email = `session-${runId}@finflow.test`
+  await page.goto('/register')
+  await waitForHydration(page, '#name')
+  await page.getByLabel('Your name', { exact: true }).fill('Session Tester')
+  await page.getByLabel('Email', { exact: true }).fill(email)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
+  await page.getByLabel('Company name', { exact: true }).fill(`Session Co ${runId}`)
+  await page.getByRole('button', { name: 'Try 14 days free' }).click()
+  await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
+  return { email, orgId: new URL(page.url()).pathname.split('/')[1] }
+}
+
+/** Fills the login form on the page that is already open (keeps its ?redirect=). */
+async function signInViaLoginForm(page: Page, email: string): Promise<void> {
+  await waitForHydration(page, '#email')
+  await page.getByLabel('Email', { exact: true }).fill(email)
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+}
+
+/** Sidebar sign-out; the AuthProvider performs the hard redirect to plain /login. */
+async function signOutViaSidebar(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await page.waitForURL(/\/login$/)
+}
+
+const VICTIM_BODY = { aspspName: 'Bank Millennium', aspspCountry: 'PL', orgId: 'victim-org' }
+
+test.describe('server session (emulators)', () => {
+  test.skip(!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST, NEEDS_EMULATORS)
+
+  test('a forged __session cookie is rejected by the proxy and cleared', async ({ page, context }) => {
+    await context.addCookies([{ name: '__session', value: '1', url: ORIGIN }])
+
+    await page.goto('/some-org/transactions')
+
+    await page.waitForURL(/\/login\?redirect=%2Fsome-org%2Ftransactions$/)
+    expect((await context.cookies()).find((c) => c.name === '__session')).toBeUndefined()
+  })
+
+  test('API routes reject forged and missing sessions with 401', async ({ request }) => {
+    const forged = await request.post('/api/enablebanking/session', {
+      headers: { Cookie: '__session=1', Origin: ORIGIN },
+      data: VICTIM_BODY,
+    })
+    expect(forged.status()).toBe(401)
+    expect((await request.get('/api/enablebanking/institutions?country=PL', { headers: { Cookie: '__session=1' } })).status()).toBe(401)
+  })
+
+  test('/api/auth/session refuses a bad Origin, a missing Origin and a garbage token', async ({ request }) => {
+    const user = await createEmulatorUser(request)
+    expect((await request.post('/api/auth/session', { headers: { Origin: 'https://evil.example' }, data: { idToken: user.idToken } })).status()).toBe(403)
+    expect((await request.post('/api/auth/session', { data: { idToken: user.idToken } })).status()).toBe(403)
+    expect((await request.post('/api/auth/session', { headers: { Origin: ORIGIN }, data: { idToken: 'garbage' } })).status()).toBe(401)
+  })
+
+  test('a live cookie without a Firebase SDK user does not trap the visitor', async ({ page, context }) => {
+    // The cookie lands in the browser context, but the browser's Firebase SDK never signed in.
+    const user = await createEmulatorUser(context.request, { verified: true })
+    const mint = await context.request.post('/api/auth/session', {
+      headers: { Origin: ORIGIN },
+      data: { idToken: user.idToken },
+    })
+    expect(mint.status()).toBe(204)
+    expect((await context.cookies()).find((c) => c.name === '__session')).toBeDefined()
+
+    // (a) The login page is reachable: the proxy leaves auth pages alone, nothing bounces to `/`.
+    await page.goto('/login')
+    await waitForHydration(page, '#email')
+    await expect(page.getByLabel('Email', { exact: true })).toBeVisible()
+    expect(new URL(page.url()).pathname).toBe('/login')
+
+    // (b) An app page: the proxy accepts the cookie, the AuthProvider finds no SDK user, clears the
+    // session and sends the visitor to /login with the return path.
+    await page.goto('/some-org/transactions')
+    await page.waitForURL(/\/login\?redirect=%2Fsome-org%2Ftransactions$/)
+    await expect
+      .poll(async () => (await context.cookies()).find((c) => c.name === '__session'))
+      .toBeUndefined()
+  })
+
+  test('registration sets an HttpOnly session cookie; unverified email gates the bank; verifying lifts the gate; cross-origin POST is refused', async ({ page, request }) => {
+    const { email } = await registerViaUi(page)
+
+    // The cookie is a real, script-invisible session (not the old "1").
+    const cookie = (await page.context().cookies()).find((c) => c.name === '__session')
+    expect(cookie?.httpOnly).toBe(true)
+    expect(cookie?.sameSite).toBe('Lax')
+    expect(cookie?.value).not.toBe('1')
+    expect(await page.evaluate(() => document.cookie)).not.toContain('__session')
+
+    // Soft verification: the app is usable, the banner shows, the bank is blocked.
+    await expect(page.getByTestId('verify-email-banner')).toBeVisible()
+    const gated = await page.context().request.post('/api/enablebanking/session', {
+      headers: { Origin: ORIGIN },
+      data: VICTIM_BODY,
+    })
+    expect(gated.status()).toBe(403)
+    expect(await gated.json()).toEqual({ error: 'email_not_verified' })
+
+    // A cross-origin POST with the valid cookie is refused before anything else.
+    const csrf = await page.context().request.post('/api/enablebanking/session', {
+      headers: { Origin: 'https://evil.example' },
+      data: VICTIM_BODY,
+    })
+    expect(csrf.status()).toBe(403)
+    expect(await csrf.json()).toEqual({ error: 'forbidden' })
+
+    // The user follows the mail link (emulator), comes back: banner gone, gate lifted
+    // (the request now fails later, on membership of the foreign org).
+    await verifyEmailInEmulator(request, email)
+    await page.reload()
+    await expect(page.getByTestId('verify-email-banner')).toHaveCount(0)
+    const verified = await page.context().request.post('/api/enablebanking/session', {
+      headers: { Origin: ORIGIN },
+      data: VICTIM_BODY,
+    })
+    expect(verified.status()).toBe(403)
+    expect(await verified.json()).toEqual({ error: 'forbidden' })
+  })
+
+  test('signing out revokes the session server-side', async ({ page, request }) => {
+    await registerViaUi(page)
+    const old = (await page.context().cookies()).find((c) => c.name === '__session')?.value
+    expect(old).toBeTruthy()
+
+    // Control: the copied cookie works from another client before sign-out (it gets past the
+    // session check and stops at the verification gate), so the 401 below is the revocation.
+    const before = await request.post('/api/enablebanking/session', {
+      headers: { Cookie: `__session=${old}`, Origin: ORIGIN },
+      data: VICTIM_BODY,
+    })
+    expect(before.status()).toBe(403)
+    expect(await before.json()).toEqual({ error: 'email_not_verified' })
+
+    // Revocation is second-granular: make sure it happens after the sign-in second.
+    await page.waitForTimeout(1_100)
+    await signOutViaSidebar(page)
+    expect((await page.context().cookies()).find((c) => c.name === '__session')).toBeUndefined()
+
+    // A copied cookie no longer works on the API (the proxy deliberately skips the revocation check,
+    // so a revoked cookie could still load pages until it expires; that is not asserted here).
+    const replay = await request.post('/api/enablebanking/session', {
+      headers: { Cookie: `__session=${old}`, Origin: ORIGIN },
+      data: VICTIM_BODY,
+    })
+    expect(replay.status()).toBe(401)
+  })
+
+  test('login ignores an off-site ?redirect= and honours the app return path after re-login', async ({ page }) => {
+    const { email, orgId } = await registerViaUi(page)
+    // Same second-granular revocation as above. Every later sign-in mints a NEW cookie whose
+    // sign-in time is after the revocation, so it is not revoked.
+    await page.waitForTimeout(1_100)
+    await signOutViaSidebar(page)
+
+    // Open-redirect attempt: the user lands on their own first org, never on the foreign host.
+    await page.goto('/login?redirect=https://evil.example')
+    await signInViaLoginForm(page, email)
+    await page.waitForURL(new RegExp(`/${orgId}/transactions$`))
+    const landed = new URL(page.url())
+    expect(landed.hostname).toBe('localhost')
+    expect(landed.pathname).toBe(`/${orgId}/transactions`)
+
+    // Legit return path: a signed-out visit to settings goes through /login and comes back.
+    await signOutViaSidebar(page)
+    await page.goto(`/${orgId}/settings`)
+    await page.waitForURL(new RegExp(`/login\\?redirect=%2F${orgId}%2Fsettings$`))
+    await signInViaLoginForm(page, email)
+    await page.waitForURL(new RegExp(`/${orgId}/settings$`))
+    expect(new URL(page.url()).pathname).toBe(`/${orgId}/settings`)
+  })
+})
