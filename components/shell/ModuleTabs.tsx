@@ -22,7 +22,7 @@ export function ModuleTabs() {
             href={tab.href(orgId)}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              '-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand',
+              '-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground',
               isActive ? 'border-brand text-ink' : 'border-transparent text-ink-muted hover:text-ink',
             )}
           >

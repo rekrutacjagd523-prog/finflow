@@ -2,8 +2,22 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* `dark:` applies under a dark <html>, except while the light-only app shell is on the page (S01A). */
-@custom-variant dark (&:is(.dark:not(:has(.app-shell)) *));
+/* `dark:` applies under a dark <html>, except while the light-only app shell is on the page (S01A).
+   The `:has` selector sits alone in its rule, behind @supports: a browser without `:has` (Firefox
+   < 121, Safari < 15.4) would otherwise drop it. There the fallback still keeps `dark:` off
+   inside .app-shell; only portaled layers (dialogs, menus) may then follow the dark root. */
+@custom-variant dark {
+  @supports selector(:has(*)) {
+    &:is(.dark:not(:has(.app-shell)) *) {
+      @slot;
+    }
+  }
+  @supports not selector(:has(*)) {
+    &:is(.dark *):not(.app-shell *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -53,14 +67,16 @@
   --color-line: #e3e7e5;
   --color-ink: #17201d;
   --color-ink-muted: #5f6b66;
-  --color-ink-subtle: #8a9590;
+  /* Text and focus tokens meet WCAG AA: >= 4.5:1 for text on surface, >= 3:1 for focus rings. */
+  --color-ink-subtle: #6b7671;
   --color-brand: #00c896;
   --color-brand-hover: #00b584;
   --color-brand-soft: #e6f9f3;
   --color-brand-soft-hover: #d2f3e8;
-  --color-brand-soft-foreground: #00875f;
-  --color-income: #00a37a;
-  --color-expense: #dc2626;
+  /* Also the focus-ring colour (`outline-brand-soft-foreground`): the brand green is only 2.2:1 on white. */
+  --color-brand-soft-foreground: #007a58;
+  --color-income: #00805c;
+  --color-expense: #d02222;
   --color-expense-soft: #fdecec;
   --radius-control: 8px;
   --radius-field: 10px;
@@ -142,9 +158,36 @@
 
 /* S01A: the signed-in app is light only. next-themes keeps `dark` on <html> (the landing
    default), so while an .app-shell is on the page the shadcn variables are pinned to the
-   FinFlow palette. :root is included because dialogs, menus and selects portal to <body>,
-   outside .app-shell. */
-.app-shell,
+   FinFlow palette. :root:has(.app-shell) repeats them because dialogs, menus and selects portal
+   to <body>, outside .app-shell. Two separate rules on purpose: a browser without `:has`
+   (Firefox < 121, Safari < 15.4) drops a whole rule whose selector list contains it, which
+   would also lose the .app-shell palette. Keep the two declaration blocks identical. */
+.app-shell {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #17201d;
+  --card: #ffffff;
+  --card-foreground: #17201d;
+  --popover: #ffffff;
+  --popover-foreground: #17201d;
+  /* Dark ink on the brand green: 7.7:1 (white on it would be 2.2:1). */
+  --primary: #00c896;
+  --primary-foreground: #17201d;
+  --primary-hover: #00b584;
+  --secondary: #f4f6f5;
+  --secondary-foreground: #17201d;
+  --muted: #f4f6f5;
+  --muted-foreground: #5f6b66;
+  --accent: #e6f9f3;
+  --accent-foreground: #007a58;
+  --destructive: #d02222;
+  --border: #e3e7e5;
+  --input: #e3e7e5;
+  --ring: #007a58;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
 :root:has(.app-shell) {
   color-scheme: light;
   --background: #ffffff;
@@ -154,23 +197,18 @@
   --popover: #ffffff;
   --popover-foreground: #17201d;
   --primary: #00c896;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #17201d;
   --primary-hover: #00b584;
   --secondary: #f4f6f5;
   --secondary-foreground: #17201d;
   --muted: #f4f6f5;
   --muted-foreground: #5f6b66;
   --accent: #e6f9f3;
-  --accent-foreground: #00875f;
-  --destructive: #dc2626;
+  --accent-foreground: #007a58;
+  --destructive: #d02222;
   --border: #e3e7e5;
   --input: #e3e7e5;
-  --ring: #00c896;
-}
-
-.app-shell {
-  font-size: 0.875rem;
-  line-height: 1.5;
+  --ring: #007a58;
 }
 
 @layer base {

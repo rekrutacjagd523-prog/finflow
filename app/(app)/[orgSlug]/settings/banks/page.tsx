@@ -16,7 +16,7 @@ export default function BanksSettingsPage() {
       <CardHeader>
         <CardTitle className="text-base font-semibold text-ink">Підключення банку</CardTitle>
         <CardDescription className="text-ink-muted">
-          Santander, PKO, mBank, ING та інші через Enable Banking Open Banking
+          Santander, PKO, mBank, ING та інші банки через Enable Banking
         </CardDescription>
       </CardHeader>
       <CardContent>

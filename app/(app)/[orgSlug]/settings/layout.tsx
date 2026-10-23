@@ -26,7 +26,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 href={settingsPath(orgSlug, section.slug)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'whitespace-nowrap rounded-control px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-brand',
+                  'whitespace-nowrap rounded-control px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-brand-soft-foreground',
                   isActive ? 'bg-brand-soft text-brand-soft-foreground' : 'text-ink-muted hover:bg-canvas hover:text-ink',
                 )}
               >

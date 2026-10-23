@@ -107,7 +107,7 @@ export default function CategoriesSettingsPage() {
                 value={newCatType}
                 onChange={(e) => setNewCatType(e.target.value as 'income' | 'expense')}
                 aria-label="Тип категорії"
-                className="h-9 rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand"
+                className="h-9 rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-soft-foreground"
               >
                 <option value="income">Дохід</option>
                 <option value="expense">Витрата</option>

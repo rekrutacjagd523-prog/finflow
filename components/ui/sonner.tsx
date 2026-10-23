@@ -1,15 +1,21 @@
 "use client"
 
+import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { isAppPath } from "@/lib/auth/paths"
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
+  // FinFlow (S01A): the signed-in app is light only, while next-themes keeps the root dark (the
+  // landing default); inside the app the toasts follow the app, elsewhere the site theme.
+  const pathname = usePathname()
+  const toasterTheme = isAppPath(pathname ?? "") ? "light" : (theme as ToasterProps["theme"])
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={toasterTheme}
       className="toaster group"
       icons={{
         success: (

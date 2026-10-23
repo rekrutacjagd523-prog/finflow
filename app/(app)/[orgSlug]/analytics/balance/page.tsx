@@ -14,7 +14,9 @@ export default function BalancePage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
   // Org and accounts come from the shell (the URL's org, one accounts subscription).
-  const { orgId, org, accounts, accountsLoading: loading } = useShell()
+  const { orgId, org, accounts, accountsLoading } = useShell()
+  // Amounts are shown in the company currency, so wait for the org as well.
+  const loading = accountsLoading || !org
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0])
 
   const handleExport = () => {
@@ -62,7 +64,7 @@ export default function BalancePage() {
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="rounded-control border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand focus:outline-none"
+            className="rounded-control border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-soft-foreground focus:outline-none"
           >
             {PERIODS.map((p) => (
               <option key={p} value={p}>{p}</option>
@@ -71,7 +73,12 @@ export default function BalancePage() {
         </div>
 
         {/* Balance sheet */}
-        <BalanceSheet accounts={accounts} orgId={orgId ?? 'default'} loading={loading} />
+        <BalanceSheet
+          accounts={accounts}
+          orgId={orgId ?? 'default'}
+          currency={org?.currency ?? 'UAH'}
+          loading={loading}
+        />
       </div>
     </div>
   )

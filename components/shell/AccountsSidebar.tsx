@@ -29,7 +29,7 @@ interface AccountsSidebarProps {
 
 function rowClass(selected: boolean): string {
   return cn(
-    'flex w-full items-center gap-3 rounded-control px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-brand',
+    'flex w-full items-center gap-3 rounded-control px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-brand-soft-foreground',
     selected ? 'bg-brand-soft font-medium text-ink' : 'text-ink hover:bg-canvas',
   )
 }
@@ -102,7 +102,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
                   aria-label={account.name}
                   title={`${account.name}: ${formatCurrency(account.balance, account.currency)}`}
                   className={cn(
-                    'flex size-9 items-center justify-center rounded-control transition-colors hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand',
+                    'flex size-9 items-center justify-center rounded-control transition-colors hover:bg-canvas focus-visible:outline-2 focus-visible:outline-brand-soft-foreground',
                     selected && 'bg-brand-soft',
                   )}
                 >
@@ -118,7 +118,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
         <Link
           href={settingsPath(orgId, 'banks')}
           aria-label="Підключити банк"
-          className="flex size-7 items-center justify-center rounded-control text-brand-soft-foreground hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand"
+          className="flex size-7 items-center justify-center rounded-control text-brand-soft-foreground hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
         >
           <Building2 className="size-4" />
         </Link>
@@ -197,7 +197,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       aria-label={`Дії з рахунком ${account.name}`}
-                      className="flex size-7 shrink-0 items-center justify-center rounded-control text-ink-subtle transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
+                      className="flex size-7 shrink-0 items-center justify-center rounded-control text-ink-subtle transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
                     >
                       <MoreHorizontal className="size-4" />
                     </DropdownMenuTrigger>
@@ -227,7 +227,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
         <Link
           href={settingsPath(orgId, 'banks')}
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-field border border-dashed border-line px-3 py-2.5 transition-colors hover:border-brand hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand"
+          className="flex items-center gap-3 rounded-field border border-dashed border-line px-3 py-2.5 transition-colors hover:border-brand hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
         >
           <Building2 className="size-4 shrink-0 text-brand-soft-foreground" />
           <span className="min-w-0">

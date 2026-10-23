@@ -45,9 +45,9 @@ export function OrgSwitcher() {
     >
       <DropdownMenuTrigger
         data-testid="org-switcher"
-        className="flex min-w-0 max-w-64 items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-brand"
+        className="flex min-w-0 max-w-64 items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors hover:bg-surface focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
       >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-brand font-display text-sm font-semibold text-white">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-control bg-brand font-display text-sm font-semibold text-ink">
           {org ? org.name.charAt(0).toUpperCase() : 'F'}
         </span>
         <span className="min-w-0">

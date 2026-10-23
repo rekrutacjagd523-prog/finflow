@@ -85,7 +85,7 @@ export default function CompanySettingsPage() {
               id="currency"
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="h-9 w-full rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand"
+              className="h-9 w-full rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-soft-foreground"
             >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>

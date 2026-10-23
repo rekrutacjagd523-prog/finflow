@@ -119,7 +119,7 @@ docs/            ← research, specs, plans
 - Sidebar total: «Разом у {валюта компанії}», only accounts in the company currency (`summarizeAccounts`); no other currency is mentioned until S04 (conversion).
 
 ### Theme
-- The signed-in app is light only. `.app-shell` and `:root:has(.app-shell)` pin the shadcn variables to the FinFlow palette (`color-scheme: light`), and `@custom-variant dark` is `&:is(.dark:not(:has(.app-shell)) *)`, i.e. off while a shell is on the page. Portaled dialogs, menus and selects therefore stay light although `next-themes` keeps `dark` on `<html>`. Marketing pages (`/`, `/pricing`) and the auth pages keep light + dark (default dark, `ThemeToggle`).
+- The signed-in app is light only. `.app-shell` and `:root:has(.app-shell)` pin the shadcn variables to the FinFlow palette (`color-scheme: light`; two separate rules, so a browser without `:has` still keeps the `.app-shell` one), and `@custom-variant dark` is `&:is(.dark:not(:has(.app-shell)) *)` behind `@supports selector(:has(*))` (fallback without `:has`: `&:is(.dark *):not(.app-shell *)`), i.e. off while a shell is on the page. Toasts use `theme="light"` on app paths (`components/ui/sonner.tsx`, `isAppPath`). Portaled dialogs, menus and selects therefore stay light although `next-themes` keeps `dark` on `<html>`. Marketing pages (`/`, `/pricing`) and the auth pages keep light + dark (default dark, `ThemeToggle`).
 - Rules: no `dark:` variants in `components/shell/*` and app pages; no hard-coded colours (`bg-[#…]`, `text-[#…]`, inline `color: '#…'`) in app pages and shell components, use the tokens below. Colours chosen by users (account/category `color`) and preset palettes stored on documents are data and stay inline. `components/charts/*`, `TransactionForm`, `AccountForm` and `EnableBankingConnect` still use literal colours (follow-up in `PROGRESS.md`).
 
 ### Tokens (`app/globals.css`, Tailwind utilities)
@@ -128,10 +128,10 @@ docs/            ← research, specs, plans
 | `canvas` | #f4f6f5 | app background, day-group rows, hovers |
 | `surface` | #ffffff | panels, cards, inputs |
 | `line` | #e3e7e5 | borders (`border-line`, `ring-line`) |
-| `ink` / `ink-muted` / `ink-subtle` | #17201d / #5f6b66 / #8a9590 | text |
-| `brand` / `brand-hover` | #00c896 / #00b584 | primary action (shadcn `--primary` and `--primary-hover` in the shell) |
-| `brand-soft` / `brand-soft-hover` / `brand-soft-foreground` | #e6f9f3 / #d2f3e8 / #00875f | soft buttons, selection, active items |
-| `income` / `expense` / `expense-soft` | #00a37a / #dc2626 / #fdecec | amounts (`+` green, `−` red, `tabular-nums`) and danger |
+| `ink` / `ink-muted` / `ink-subtle` | #17201d / #5f6b66 / #6b7671 | text (`ink-subtle` 4.7:1 on white: placeholders, secondary lines) |
+| `brand` / `brand-hover` | #00c896 / #00b584 | primary action fill (shadcn `--primary` and `--primary-hover` in the shell); text on it is dark ink (`--primary-foreground` #17201d, 7.7:1), never white (2.2:1) |
+| `brand-soft` / `brand-soft-hover` / `brand-soft-foreground` | #e6f9f3 / #d2f3e8 / #007a58 | soft buttons, selection, active items; `brand-soft-foreground` is also the focus-ring colour (`focus-visible:outline-brand-soft-foreground`, shadcn `--ring`) |
+| `income` / `expense` / `expense-soft` | #00805c / #d02222 / #fdecec | amounts (`+` green, `−` red, `tabular-nums`) and danger; both >= 4.5:1 on white and on `canvas` |
 | `rounded-control` / `rounded-field` / `rounded-panel` | 8 / 10 / 12 px | buttons and rows / fields and blocks / panels and cards |
 | `shadow-panel` / `shadow-pop` | minimal | the shell panel / floating layers |
 

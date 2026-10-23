@@ -9,7 +9,7 @@ import type { Account, Category } from '@/types'
 import type { TransactionFilters } from '@/lib/firebase/transactions'
 
 const SELECT_CLASS =
-  'h-9 min-w-[150px] rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand'
+  'h-9 min-w-[150px] rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-soft-foreground'
 const FIELD_CLASS = 'h-9 rounded-control border-line bg-surface'
 
 interface TransactionFiltersProps {

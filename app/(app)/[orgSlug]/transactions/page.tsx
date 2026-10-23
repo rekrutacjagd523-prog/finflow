@@ -33,7 +33,7 @@ export default function TransactionsPage() {
               type="button"
               onClick={() => selectAccount(null)}
               aria-label="Показати всі рахунки"
-              className="flex size-5 items-center justify-center rounded-full hover:bg-surface focus-visible:outline-2 focus-visible:outline-brand"
+              className="flex size-5 items-center justify-center rounded-full hover:bg-surface focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
             >
               <X className="size-3" />
             </button>

@@ -27,7 +27,7 @@ export function AppHeader() {
       </Button>
       <Link
         href={`/${orgId}/transactions`}
-        className="hidden shrink-0 rounded-control font-display text-base font-semibold tracking-tight text-ink focus-visible:outline-2 focus-visible:outline-brand lg:block"
+        className="hidden shrink-0 rounded-control font-display text-base font-semibold tracking-tight text-ink focus-visible:outline-2 focus-visible:outline-brand-soft-foreground lg:block"
       >
         Fin<span className="text-brand">Flow</span>
       </Link>

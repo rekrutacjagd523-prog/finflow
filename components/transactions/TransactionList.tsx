@@ -138,7 +138,7 @@ export function TransactionList({
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') setEditTx(tx)
                       }}
-                      className="cursor-pointer hover:bg-canvas focus-visible:bg-brand-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
+                      className="cursor-pointer hover:bg-canvas focus-visible:bg-brand-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-soft-foreground"
                     >
                       <TableCell className="hidden pl-4 text-ink-muted tabular-nums sm:table-cell">
                         {formatDayShortUtc(tx.date)}

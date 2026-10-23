@@ -26,7 +26,7 @@ export function ProfileMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Профіль"
-        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold text-ink transition-colors hover:border-brand focus-visible:outline-2 focus-visible:outline-brand"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-sm font-semibold text-ink transition-colors hover:border-brand focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
       >
         {initial}
       </DropdownMenuTrigger>

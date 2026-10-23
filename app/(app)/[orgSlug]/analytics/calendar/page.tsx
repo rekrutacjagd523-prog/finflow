@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
+import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import CalendarView from '@/components/charts/CalendarView'
 import { ArrowLeft } from 'lucide-react'
@@ -11,7 +12,10 @@ export default function CalendarPage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
-  const { transactions, loading } = useTransactions(orgId)
+  const { transactions, loading: txLoading } = useTransactions(orgId)
+  // Totals are shown in the company currency, so wait for the org as well.
+  const { org } = useShell()
+  const loading = txLoading || !org
 
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
@@ -51,6 +55,7 @@ export default function CalendarPage() {
           year={year}
           month={month}
           onNavigate={handleNavigate}
+          currency={org?.currency ?? 'UAH'}
           loading={loading}
         />
       </div>

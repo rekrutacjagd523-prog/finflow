@@ -4,12 +4,15 @@ import { useState } from 'react'
 import { Transaction } from '@/types'
 import { buildCalendar, DayData } from '@/lib/utils/analytics'
 import { ChevronLeft, ChevronRight, ChevronRight as ExpandIcon } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils/currency'
 
 interface CalendarViewProps {
   transactions: Transaction[]
   year: number
   month: number
   onNavigate: (dir: 'prev' | 'next') => void
+  /** The company currency, used for the day and month totals. */
+  currency: string
   loading?: boolean
 }
 
@@ -19,13 +22,6 @@ const UA_MONTHS_FULL = [
 ]
 
 const UA_WEEKDAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
-
-function formatNum(n: number): string {
-  return new Intl.NumberFormat('uk-UA', {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  }).format(n)
-}
 
 function getDayOfWeek(year: number, month: number, day: number): string {
   return UA_WEEKDAYS[new Date(year, month, day).getDay()]
@@ -47,9 +43,10 @@ interface DayRowProps {
   year: number
   month: number
   transactions: Transaction[]
+  currency: string
 }
 
-function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
+function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProps) {
   const [expanded, setExpanded] = useState(false)
 
   const dayTxs = transactions.filter((tx) => {
@@ -92,14 +89,14 @@ function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
         <div className="flex items-center gap-4 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
           {day.income > 0 ? (
             <span className="text-sm font-medium text-[#22c55e] min-w-[90px] text-right">
-              +{formatNum(day.income)} €
+              +{formatCurrency(day.income, currency)}
             </span>
           ) : (
             <span className="min-w-[90px]" />
           )}
           {day.expense > 0 ? (
             <span className="text-sm font-medium text-[#ef4444] min-w-[90px] text-right">
-              -{formatNum(day.expense)} €
+              -{formatCurrency(day.expense, currency)}
             </span>
           ) : (
             <span className="min-w-[90px]" />
@@ -108,7 +105,7 @@ function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
             className="text-sm min-w-[90px] text-right"
             style={{ color: day.balance >= 0 ? '#6b7280' : '#ef4444' }}
           >
-            {formatNum(day.balance)} €
+            {formatCurrency(day.balance, currency)}
           </span>
         </div>
 
@@ -141,7 +138,7 @@ function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
                 }}
               >
                 {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                {formatNum(tx.amount)} {tx.currency}
+                {formatCurrency(tx.amount, tx.currency)}
               </span>
             </div>
           ))}
@@ -151,7 +148,7 @@ function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
   )
 }
 
-export default function CalendarView({ transactions, year, month, onNavigate, loading }: CalendarViewProps) {
+export default function CalendarView({ transactions, year, month, onNavigate, currency, loading }: CalendarViewProps) {
   const days = buildCalendar(transactions, year, month)
   const totalIncome = days.reduce((s, d) => s + d.income, 0)
   const totalExpense = days.reduce((s, d) => s + d.expense, 0)
@@ -174,10 +171,10 @@ export default function CalendarView({ transactions, year, month, onNavigate, lo
           </h3>
           <div className="flex gap-3 text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {totalIncome > 0 && (
-              <span className="text-[#22c55e]">+{formatNum(totalIncome)} €</span>
+              <span className="text-[#22c55e]">+{formatCurrency(totalIncome, currency)}</span>
             )}
             {totalExpense > 0 && (
-              <span className="text-[#ef4444]">-{formatNum(totalExpense)} €</span>
+              <span className="text-[#ef4444]">-{formatCurrency(totalExpense, currency)}</span>
             )}
           </div>
         </div>
@@ -221,6 +218,7 @@ export default function CalendarView({ transactions, year, month, onNavigate, lo
               year={year}
               month={month}
               transactions={transactions}
+              currency={currency}
             />
           ))}
         </div>
