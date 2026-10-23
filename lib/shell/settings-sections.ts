@@ -13,6 +13,15 @@ export function settingsPath(orgId: string, section: SettingsSection): string {
   return `/${encodeURIComponent(orgId)}/settings/${section}`
 }
 
+/**
+ * True anywhere under `/<org>/settings` (the index too). The shell then swaps its left column:
+ * the settings menu replaces the accounts sidebar and the module tabs are hidden (as in Finmap).
+ */
+export function isSettingsPath(pathname: string, orgId: string): boolean {
+  const base = `/${encodeURIComponent(orgId)}/settings`
+  return pathname === base || pathname.startsWith(`${base}/`)
+}
+
 /** The section a pathname belongs to (`/<org>/settings/<section>/...`), or null. */
 export function activeSettingsSection(pathname: string, orgId: string): SettingsSection | null {
   const prefix = `/${encodeURIComponent(orgId)}/settings/`

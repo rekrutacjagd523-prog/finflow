@@ -2,9 +2,30 @@ import { describe, expect, it } from 'vitest'
 import {
   SETTINGS_SECTIONS,
   activeSettingsSection,
+  isSettingsPath,
   settingsIndexRedirect,
   settingsPath,
 } from '@/lib/shell/settings-sections'
+
+describe('isSettingsPath', () => {
+  it.each(['/org1/settings', '/org1/settings/', '/org1/settings/company', '/org1/settings/banks/x'])(
+    '%s is a settings path',
+    (path) => {
+      expect(isSettingsPath(path, 'org1')).toBe(true)
+    },
+  )
+
+  it.each(['/org1/settingsx', '/org1/transactions', '/org2/settings/company', '/org1/analytics/settings', '/'])(
+    '%s is not',
+    (path) => {
+      expect(isSettingsPath(path, 'org1')).toBe(false)
+    },
+  )
+
+  it('matches an org id that needs encoding against the encoded pathname', () => {
+    expect(isSettingsPath('/org%201/settings/banks', 'org 1')).toBe(true)
+  })
+})
 
 describe('SETTINGS_SECTIONS', () => {
   it('lists the four sections in menu order', () => {

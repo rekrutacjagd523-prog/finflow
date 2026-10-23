@@ -101,10 +101,11 @@ test.describe('app shell (emulators)', () => {
     await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
     await expect(payments).toHaveAttribute('aria-current', 'page')
 
-    // Settings is not a module: no tab is current there.
+    // Settings is not a module but a separate screen: the module tabs are not shown there.
     await page.goto(`/${user.orgId}/settings/company`)
     await waitForShell(page, user.companyName)
-    await expect(tabs.locator('[aria-current="page"]')).toHaveCount(0)
+    await expect(page.getByRole('navigation', { name: 'Розділи налаштувань' })).toBeVisible()
+    await expect(tabs).toHaveCount(0)
   })
 
   test('the sidebar collapses and stays collapsed after a reload', async ({ page }) => {
@@ -238,15 +239,26 @@ test.describe('app shell (emulators)', () => {
     }
   })
 
-  test('settings: four sections in the menu; the old URL redirects to Company with its query', async ({ page }) => {
+  test('settings: a separate screen whose left column is the menu of four sections; the old URL redirects to Company with its query', async ({ page }) => {
     const user = await registerViaUi(page, 'settings')
     await waitForShell(page, user.companyName)
+    const modules = page.getByRole('navigation', { name: 'Модулі' })
+    await expect(accountsSidebar(page)).toBeVisible()
+    await expect(modules).toBeVisible()
 
     await page.goto(`/${user.orgId}/settings?from=e2e`)
     await page.waitForURL(new RegExp(`/${user.orgId}/settings/company\\?from=e2e$`))
 
-    const menu = page.getByRole('navigation', { name: 'Розділи налаштувань' })
+    // The settings menu replaces the accounts sidebar, and the module tabs are gone.
+    const settingsColumn = page.getByRole('complementary', { name: 'Налаштування' })
+    const menu = settingsColumn.getByRole('navigation', { name: 'Розділи налаштувань' })
     await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Категорії', 'Банки', 'Підписка'])
+    await expect(page.getByRole('navigation', { name: 'Розділи налаштувань' })).toHaveCount(1)
+    await expect(accountsSidebar(page)).toHaveCount(0)
+    await expect(modules).toHaveCount(0)
+    // The header (company switcher, operation buttons, profile) stays.
+    await expect(page.getByRole('button', { name: 'Дохід', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Профіль' })).toBeVisible()
 
     const sections = [
       { link: 'Компанія', path: 'company', marker: page.getByLabel('Назва', { exact: true }) },
@@ -260,6 +272,25 @@ test.describe('app shell (emulators)', () => {
       await expect(menu.getByRole('link', { name: link })).toHaveAttribute('aria-current', 'page')
       await expect(marker).toBeVisible()
     }
+
+    // «До платежів» leads back to the journal, where the accounts sidebar and the tabs return.
+    await settingsColumn.getByRole('link', { name: 'До платежів' }).click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
+    await expect(accountsSidebar(page)).toBeVisible()
+    await expect(modules.getByRole('link', { name: 'Платежі' })).toHaveAttribute('aria-current', 'page')
+    await expect(settingsColumn).toHaveCount(0)
+
+    // Phone: no left column; the sections are a pill row with the same name, plus the way back.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`/${user.orgId}/settings/banks`)
+    await waitForShell(page, user.companyName)
+    const phoneMenu = page.getByRole('navigation', { name: 'Розділи налаштувань' })
+    await expect(phoneMenu.getByRole('link', { name: 'Банки' })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('complementary', { name: 'Налаштування' })).toBeHidden()
+    await expect(modules).toHaveCount(0)
+    await page.getByRole('link', { name: 'До платежів' }).click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
+    await expect(modules).toBeVisible()
   })
 
   test('the company switcher lists both organizations and switches between them without flicker', async ({ page, request }) => {
