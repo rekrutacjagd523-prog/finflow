@@ -70,6 +70,7 @@ app/
 components/
   ui/            ← shadcn generated files (CLI only; the hand edits are marked `FinFlow (S01A)`)
   shell/         ← AppShell, AppHeader, OrgSwitcher, ProfileMenu, AccountsSidebar, ModuleTabs (S01A)
+  analytics/     ← PeriodSelect, ReportToolbar (report period filter)
   charts/ forms/ transactions/ settings/ landing/ auth/ (VerifyEmailBanner)  ThemeToggle.tsx
 lib/
   auth/          ← paths.ts: pure path and `?redirect=` rules shared by proxy.ts and the browser
@@ -78,7 +79,7 @@ lib/
   server/        ← server-only: firebase-admin.ts, auth.ts, session-cookie.ts, request-guards.ts, http-error.ts, eb-state.ts
   enablebanking/ ← jwt.ts (server-only), client.ts (ebFetch)
   shell/         ← pure shell helpers: modules.ts (tabs), settings-sections.ts, sidebar-store.ts
-  utils/         ← accounts (summarizeAccounts), analytics, currency, date, export (CSV), journal (day totals, UTC dates)
+  utils/         ← accounts (summarizeAccounts), analytics, currency, date, export (CSV), journal (day totals, UTC dates), period + calendar-grid (report periods, UTC)
 scripts/         ← check-server-imports.mjs (CI guard), vercel.mjs (Vercel API helper), verify-firestore-rules.mjs (black-box rules check)
 types/           ← shared TS types (Organization, Account, Transaction, …)
 tests/
@@ -145,9 +146,10 @@ docs/            ← research, specs, plans
 - One primary action per section; the header CTAs are the exception (they are the app's main entry points).
 - Journal: a real table (`components/ui/table.tsx`) flush in the shell panel (no card of its own), grouped by day (`th scope="rowgroup"`, transparent band with a muted label and the day total), no delete. Editing: a click anywhere on the row (mouse), or the row's real `<button>` in the account cell (the first cell visible at every width; name = account + amount + date + «редагувати»); the row itself is not a Tab stop. The page `h1` «Платежі» is `sr-only` (the active tab names the page); the selected-account chip sits at the end of the toolbar. Rows have two lines: the date over the weekday (`formatWeekdayShortUtc`, UTC like the grouping) and the account over its type. Below `sm` the row is account + category on the left, amount on the right; the day total sits in the group header (a day with several currencies shows none).
 - Charts: Recharts with custom tooltips, colours from the tokens (`TOKEN_COLORS` for props, utilities for classes); fixed layouts.
+- Report period filter (Finmap structure, at the owner's request): `PeriodSelect` (`components/analytics/`; a toolbar pill + Base UI menu of `menuitemradio`s under «ЗА ДАТОЮ ОПЕРАЦІЇ») with `DateRangePicker` (`components/ui/date-range-picker.tsx`, hand-written: one month, Monday first, two clicks with a preview, «Скасувати» / «Застосувати») is the standard period filter of the reports; `ReportToolbar` puts it first in the pill row under the title, then the CSV icon button. Presets (`lib/utils/period.ts`, `REPORT_PERIOD_PRESETS`): current year (default), previous year, current / last week (Monday first), current / last month, custom range; `allTime` exists for the journal, which reuses the component in S08. `resolvePeriod()` gives an inclusive UTC range (Europe/Warsaw in S03) that `buildCashFlow` (months above 31 days, days otherwise) and `buildPL` take; CSV names carry `periodSlug()`.
 
 ### Visual check
-- `npm run ui:shots` (see Commands) writes 26 screenshots to `ui-shots/` (gitignored; desktop 1440×900 and phone 390×844: payments, operation form, collapsed sidebar or drawer, the four analytics reports, profile menu, the settings screen and its four sections) with `dark` forced on `<html>`. Run it after any shell or token change and look at the images before calling a UI task done.
+- `npm run ui:shots` (see Commands) writes 30 screenshots to `ui-shots/` (gitignored; desktop 1440×900 and phone 390×844: payments, operation form, collapsed sidebar or drawer, the four analytics reports, the Cash Flow period menu and date range picker, profile menu, the settings screen and its four sections) with `dark` forced on `<html>`. Run it after any shell or token change and look at the images before calling a UI task done.
 
 ## Banned Copy Phrases
 - "seamless", "powerful", "robust", "leverage", "streamline"
