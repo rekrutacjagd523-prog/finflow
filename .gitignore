@@ -58,3 +58,6 @@ ui-debug.log*
 
 # committed env template (names only)
 !.env.example
+
+# Brainstorming visual companion sessions (local mockups)
+.superpowers/
