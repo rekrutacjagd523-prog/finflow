@@ -38,14 +38,33 @@ export function isOrgMember(orgData: unknown, uid: string): boolean {
   return Object.hasOwn(members, uid)
 }
 
+// firebase-admin 14 reports a failure to fetch Google's signing keys (lib/utils/jwt.js,
+// UrlKeyFetcher.refresh -> token-verifier mapJwtErrorToAuthError) as INVALID_ARGUMENT, i.e.
+// `auth/argument-error`, which is indistinguishable by code from a malformed cookie. Only
+// the message tells them apart. Both prefixes are fixed SDK texts; messages that quote
+// caller-controlled data (decode, alg, aud, iss, sub) start with "Firebase ...", never these.
+const KEY_FETCH_FAILURE_PREFIXES = [
+  'Error fetching public keys for Google certs: ', // HTTP error response from the certs URL
+  'Error while making request: ', // transport failure (DNS, timeout, reset)
+]
+
+/** True when `e` is the SDK's "could not fetch Google's signing keys" failure: our outage. */
+function isKeyFetchFailure(e: unknown): boolean {
+  const message = (e as { message?: unknown } | null)?.message
+  return (
+    typeof message === 'string' && KEY_FETCH_FAILURE_PREFIXES.some((p) => message.startsWith(p))
+  )
+}
+
 /**
  * Maps a failed Admin Auth call to an HttpError: 401 for credential problems, 503 for
- * everything else. `operation` only labels the log line; the error code or class name is
- * logged, never the message body (it can quote the token or cookie).
+ * everything else (including a failed signing-key fetch, see isKeyFetchFailure). `operation`
+ * only labels the log line; the error code or class name is logged, never the message body
+ * (it can quote the token or cookie).
  */
 export function toAuthHttpError(e: unknown, operation: string): HttpError {
   const code = (e as { code?: unknown } | null)?.code
-  if (typeof code === 'string' && TOKEN_ERROR_CODES.has(code)) {
+  if (typeof code === 'string' && TOKEN_ERROR_CODES.has(code) && !isKeyFetchFailure(e)) {
     return new HttpError(401, 'unauthorized')
   }
   const kind = typeof code === 'string' ? code : e instanceof Error ? e.name : typeof e
@@ -104,8 +123,10 @@ export async function requireVerifiedUser(req: Request): Promise<SessionUser> {
 /**
  * Signature + expiry check of a session cookie WITHOUT the revocation round-trip. Used by
  * proxy.ts on every page navigation; API routes use requireUser for the full check.
- * Returns false for an unacceptable cookie; throws HttpError(503) when verification failed
- * for reasons on our side (the proxy then answers 503 instead of logging everyone out).
+ * Returns false for an unacceptable cookie. Throws HttpError(503) when verification failed
+ * for reasons on our side (outage, signing keys unreachable; the proxy then answers 503
+ * instead of logging everyone out) and HttpError(500) when the server is not configured
+ * (getAdmin failure).
  */
 export async function isSessionCookieValid(cookie: string): Promise<boolean> {
   const { auth } = getAdmin()

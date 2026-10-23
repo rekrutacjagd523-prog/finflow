@@ -91,6 +91,19 @@ function rejection(code: string, message = 'x'): Error {
   return Object.assign(new Error(message), { code })
 }
 
+// Messages firebase-admin 14.5.0 (lib/utils/jwt.js, UrlKeyFetcher) produces when Google's
+// signing keys cannot be fetched: an HTTP error response, or a transport failure.
+const KEY_FETCH_FAILURES: Array<[string, string]> = [
+  [
+    'HTTP error response',
+    'Error fetching public keys for Google certs: SECRET-BODY (upstream said no)',
+  ],
+  [
+    'transport failure',
+    'Error while making request: getaddrinfo ENOTFOUND www.googleapis.com SECRET-BODY. Error code: ENOTFOUND',
+  ],
+]
+
 describe('requireUser', () => {
   it('returns uid and emailVerified for a valid, unrevoked session cookie', async () => {
     admin.verifySessionCookie.mockResolvedValue({ uid: 'u1', email_verified: true })
@@ -170,6 +183,40 @@ describe('requireUser', () => {
     expect(err).toMatchObject({ status: 500, message: 'server not configured' })
   })
 
+  // firebase-admin 14 maps a failure to fetch Google's signing keys to INVALID_ARGUMENT
+  // (auth/argument-error), indistinguishable by code from a malformed cookie.
+  it.each(KEY_FETCH_FAILURES)(
+    'maps a signing-key fetch failure (%s) to 503 although its code is auth/argument-error',
+    async (_label, message) => {
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      admin.verifySessionCookie.mockRejectedValue(rejection('auth/argument-error', message))
+
+      const err = await requireUser(requestWithCookie('__session=secret-cookie')).catch(
+        (e: unknown) => e,
+      )
+
+      expect(err).toMatchObject({ status: 503, message: 'auth unavailable' })
+      expect(log).toHaveBeenCalledWith('verifySessionCookie failed', 'auth/argument-error')
+      const dump = JSON.stringify(log.mock.calls)
+      expect(dump).not.toContain('SECRET-BODY')
+      expect(dump).not.toContain('secret-cookie')
+      log.mockRestore()
+    },
+  )
+
+  it('keeps a malformed cookie (auth/argument-error with a decode message) at 401', async () => {
+    admin.verifySessionCookie.mockRejectedValue(
+      rejection(
+        'auth/argument-error',
+        'Decoding Firebase session cookie failed. Make sure you passed the entire string JWT.',
+      ),
+    )
+
+    const err = await requireUser(requestWithCookie('__session=junk')).catch((e: unknown) => e)
+
+    expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
+  })
+
   describe('same-origin check for unsafe methods', () => {
     beforeEach(() => {
       admin.verifySessionCookie.mockResolvedValue({ uid: 'u1', email_verified: true })
@@ -190,6 +237,17 @@ describe('requireUser', () => {
       ).catch((e: unknown) => e)
 
       expect(err).toMatchObject({ status: 403, message: 'forbidden' })
+      expect(admin.verifySessionCookie).toHaveBeenCalledWith('g', true)
+    })
+
+    it('answers 401, not 403, when the session is invalid and the POST has no Origin', async () => {
+      admin.verifySessionCookie.mockRejectedValue(rejection('auth/session-cookie-revoked'))
+
+      const err = await requireUser(requestWithCookie('__session=g', { method: 'POST' })).catch(
+        (e: unknown) => e,
+      )
+
+      expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
     })
 
     it('does not check Origin for GET', async () => {
@@ -228,6 +286,15 @@ describe('requireVerifiedUser', () => {
     const err = await requireVerifiedUser(requestWithCookie('__session=g')).catch((e: unknown) => e)
 
     expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 403, message: 'email_not_verified' })
+  })
+
+  it('rejects with 403 when the cookie claim says verified but the live record does not', async () => {
+    admin.verifySessionCookie.mockResolvedValue({ uid: 'u1', email_verified: true })
+    admin.getUser.mockResolvedValue({ uid: 'u1', emailVerified: false })
+
+    const err = await requireVerifiedUser(requestWithCookie('__session=g')).catch((e: unknown) => e)
+
     expect(err).toMatchObject({ status: 403, message: 'email_not_verified' })
   })
 
@@ -274,8 +341,45 @@ describe('isSessionCookieValid', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {})
     admin.verifySessionCookie.mockRejectedValue(rejection('auth/internal-error'))
 
-    await expect(isSessionCookieValid('x')).rejects.toMatchObject({ status: 503 })
+    const err = await isSessionCookieValid('x').catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 503 })
+    expect(log).toHaveBeenCalledWith('verifySessionCookie failed', 'auth/internal-error')
     log.mockRestore()
+  })
+
+  it.each(KEY_FETCH_FAILURES)(
+    'throws a 503 HttpError, not false, when the signing keys cannot be fetched (%s)',
+    async (_label, message) => {
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      admin.verifySessionCookie.mockRejectedValue(rejection('auth/argument-error', message))
+
+      const err = await isSessionCookieValid('x').catch((e: unknown) => e)
+
+      expect(err).toBeInstanceOf(HttpError)
+      expect(err).toMatchObject({ status: 503 })
+      log.mockRestore()
+    },
+  )
+
+  it('is false for a malformed cookie (auth/argument-error with a decode message)', async () => {
+    admin.verifySessionCookie.mockRejectedValue(
+      rejection('auth/argument-error', 'Decoding Firebase session cookie failed.'),
+    )
+
+    await expect(isSessionCookieValid('junk')).resolves.toBe(false)
+  })
+
+  it('propagates a server configuration error as 500', async () => {
+    admin.getAdmin.mockImplementation(() => {
+      throw new HttpError(500, 'server not configured')
+    })
+
+    const err = await isSessionCookieValid('x').catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 500, message: 'server not configured' })
   })
 })
 
