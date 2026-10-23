@@ -4,8 +4,10 @@ import type { User } from 'firebase/auth'
 
 /**
  * Exchanges the signed-in user's ID token for the HttpOnly `__session` cookie.
- * Call it right after every successful Firebase sign-in/sign-up: the server only accepts a
- * sign-in that is at most 5 minutes old. getIdToken(true) guarantees a fresh token.
+ * Call it right after every successful credential sign-in/sign-up: the server only accepts a
+ * sign-in that is at most 5 minutes old, judged by the token's auth_time (the moment of the
+ * credential sign-in). getIdToken(true) only guarantees a non-expired token; a refresh does not
+ * change auth_time, so this cannot be deferred to later.
  */
 export async function establishSession(user: User): Promise<void> {
   const idToken = await user.getIdToken(true)

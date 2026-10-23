@@ -17,7 +17,7 @@ import {
   signOut as firebaseSignOut,
 } from '@/lib/firebase/auth'
 import { clearSession } from '@/lib/firebase/session'
-import { isAppPath } from '@/lib/auth/paths'
+import { isAppPath, loginUrlAfterSessionLoss } from '@/lib/auth/paths'
 
 interface AuthContextValue {
   user: User | null
@@ -54,12 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The Firebase SDK has no user. The server session (HttpOnly cookie, invisible to scripts)
       // must not outlive it: drop it when the user was signed in a moment ago (sign-out in another
       // tab, revoked or deleted account) or when we are on an app page that the proxy let through
-      // on a cookie whose SDK user is gone. On an app page, also leave for /login.
+      // on a cookie whose SDK user is gone. On an app page, also leave for /login (keeping the
+      // return path unless the user just signed out).
       const onAppPage = isAppPath(window.location.pathname)
-      if (hadUser.current || onAppPage) {
+      const justSignedOut = hadUser.current
+      if (justSignedOut || onAppPage) {
         hadUser.current = false
         void clearSession().finally(() => {
-          if (onAppPage) window.location.replace('/login')
+          if (onAppPage) {
+            window.location.replace(
+              loginUrlAfterSessionLoss({
+                justSignedOut,
+                pathname: window.location.pathname,
+                search: window.location.search,
+              }),
+            )
+          }
         })
       }
     })

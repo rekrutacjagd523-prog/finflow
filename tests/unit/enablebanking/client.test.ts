@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ebFetch } from '@/lib/enablebanking/client'
+import { clearSession } from '@/lib/firebase/session'
+
+vi.mock('@/lib/firebase/session', () => ({ clearSession: vi.fn() }))
 
 const fetchMock = vi.fn()
 const assign = vi.fn()
+const clearSessionMock = vi.mocked(clearSession)
 
 describe('ebFetch', () => {
   beforeEach(() => {
     fetchMock.mockReset()
     assign.mockReset()
+    clearSessionMock.mockReset()
+    clearSessionMock.mockResolvedValue(undefined)
     fetchMock.mockResolvedValue(new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     vi.stubGlobal('window', { location: { pathname: '/org-acme/settings', search: '?x=1', assign } })
@@ -50,10 +56,26 @@ describe('ebFetch', () => {
     expect(assign).toHaveBeenCalledWith('/login?redirect=%2Forg-acme%2Fsettings%3Fx%3D1')
   })
 
+  it('clears the rejected session cookie before navigating on a 401', async () => {
+    fetchMock.mockResolvedValue(new Response('{}', { status: 401 }))
+    const order: string[] = []
+    clearSessionMock.mockImplementation(async () => {
+      order.push('clearSession')
+    })
+    assign.mockImplementation(() => {
+      order.push('assign')
+    })
+
+    await ebFetch('/api/enablebanking/institutions')
+
+    expect(order).toEqual(['clearSession', 'assign'])
+  })
+
   it.each([403, 500])('does not redirect on %s', async (status) => {
     fetchMock.mockResolvedValue(new Response('{}', { status }))
     await ebFetch('/api/enablebanking/institutions')
     expect(assign).not.toHaveBeenCalled()
+    expect(clearSessionMock).not.toHaveBeenCalled()
   })
 
   it('refuses any path outside /api/enablebanking/*', async () => {

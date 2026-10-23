@@ -11,7 +11,6 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useOrg } from '@/lib/hooks/useOrg'
-import { useRouter } from 'next/navigation'
 
 const navItems = (orgSlug: string) => [
   {
@@ -34,14 +33,13 @@ const navItems = (orgSlug: string) => [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
   const pathname = usePathname()
-  const router = useRouter()
   const { signOut, user } = useAuth()
   const { org } = useOrg()
   const orgSlug = params.orgSlug as string
 
   const handleSignOut = async () => {
+    // The AuthProvider listener performs the hard redirect to /login.
     await signOut()
-    router.push('/login')
   }
 
   return (

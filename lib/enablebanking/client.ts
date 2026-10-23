@@ -1,5 +1,7 @@
 'use client'
 
+import { clearSession } from '@/lib/firebase/session'
+
 const ALLOWED_PREFIX = '/api/enablebanking/'
 
 /**
@@ -27,7 +29,8 @@ function isAllowedPath(path: string): boolean {
 /**
  * fetch() for FinFlow's own /api/enablebanking/* routes from the browser.
  * Authentication is the HttpOnly `__session` cookie, sent automatically on same-origin requests,
- * so no token is handled here. A 401 means the session is gone: send the user to /login and
+ * so no token is handled here. A 401 means the session is gone: drop the rejected cookie (the proxy
+ * cannot see a revocation and would bounce /login back to the app), send the user to /login and
  * bring them back afterwards.
  */
 export async function ebFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -36,6 +39,7 @@ export async function ebFetch(path: string, init?: RequestInit): Promise<Respons
   }
   const res = await fetch(path, { ...init, credentials: 'same-origin' })
   if (res.status === 401 && typeof window !== 'undefined') {
+    await clearSession()
     const back = encodeURIComponent(window.location.pathname + window.location.search)
     // Not a React context (plain helper), so the router is unavailable: a full navigation is intended.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { isAppPath, isAuthPath, isPublicPath, safeRedirectPath } from '@/lib/auth/paths'
+import {
+  isAppPath,
+  isAuthPath,
+  isPublicPath,
+  loginUrlAfterSessionLoss,
+  safeRedirectPath,
+} from '@/lib/auth/paths'
 
 describe('isPublicPath', () => {
   it.each(['/login', '/register', '/forgot-password', '/login/extra'])('is true for %s', (p) => {
@@ -72,7 +78,32 @@ describe('safeRedirectPath', () => {
     ['bare /api with query', '/api?x=1'],
     ['bare /api with hash', '/api#x'],
     ['too long', '/' + 'a'.repeat(600)],
+    ['dot segment collapsing into //host', '/.//evil.example'],
+    ['parent segment collapsing into //host', '/..//evil.example'],
+    ['login page', '/login'],
+    ['login page with query', '/login?redirect=%2Forg1%2Fsettings'],
+    ['register page', '/register'],
+    ['page under login', '/login/x'],
+    ['encoded login page', '/%6Cogin'],
   ])('rejects %s', (_label, value) => {
     expect(safeRedirectPath(value as string | null | undefined)).toBeNull()
+  })
+})
+
+describe('loginUrlAfterSessionLoss', () => {
+  it('goes to a plain /login after a deliberate sign-out', () => {
+    expect(
+      loginUrlAfterSessionLoss({ justSignedOut: true, pathname: '/org1/transactions', search: '?month=2026-10' }),
+    ).toBe('/login')
+  })
+
+  it('keeps the return path when an app page was loaded on an orphaned cookie', () => {
+    expect(
+      loginUrlAfterSessionLoss({ justSignedOut: false, pathname: '/org1/transactions', search: '?month=2026-10' }),
+    ).toBe('/login?redirect=%2Forg1%2Ftransactions%3Fmonth%3D2026-10')
+  })
+
+  it('drops an unsafe return path', () => {
+    expect(loginUrlAfterSessionLoss({ justSignedOut: false, pathname: '/api/x', search: '' })).toBe('/login')
   })
 })

@@ -40,10 +40,29 @@ export function safeRedirectPath(raw: string | null | undefined): string | null 
   try {
     const url = new URL(raw, 'http://x')
     if (url.origin !== 'http://x') return null
+    // Dot segments can collapse into a protocol-relative path (`/.//evil.example` -> `//evil.example`).
+    if (url.pathname.startsWith('//')) return null
     pathname = decodeURIComponent(url.pathname)
   } catch {
     return null
   }
   if (pathname === '/api' || pathname.startsWith('/api/')) return null
+  // Never send a freshly signed-in user back to a sign-in page (login -> /login bounce).
+  if (isAuthPath(pathname)) return null
   return raw
+}
+
+/**
+ * Where the browser goes when the SDK user disappeared. After a deliberate sign-out: plain
+ * `/login`. Otherwise (an app page the proxy let through on an orphaned cookie): `/login` with the
+ * current page as the validated return path.
+ */
+export function loginUrlAfterSessionLoss(opts: {
+  justSignedOut: boolean
+  pathname: string
+  search: string
+}): string {
+  if (opts.justSignedOut) return '/login'
+  const back = safeRedirectPath(opts.pathname + opts.search)
+  return back ? '/login?redirect=' + encodeURIComponent(back) : '/login'
 }
