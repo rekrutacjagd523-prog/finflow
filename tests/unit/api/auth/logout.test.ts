@@ -34,8 +34,37 @@ describe('POST /api/auth/logout', () => {
 
     expect(res.status).toBe(204)
     expect(res.headers.get('set-cookie')).toBe(CLEARED)
-    expect(fakeAdmin.auth.verifySessionCookie).toHaveBeenCalledWith('token-alice', false)
+    expect(fakeAdmin.auth.verifySessionCookie).toHaveBeenCalledWith('token-alice', true)
     expect(fakeAdmin.auth.revokeRefreshTokens).toHaveBeenCalledWith('user-alice')
+  })
+
+  it('clears an already revoked cookie without revoking the newer sessions and without logging', async () => {
+    // A stale tab or device must not log the user out of the session they started since. Like the
+    // real SDK, a revoked cookie still decodes when the revocation check is skipped.
+    fakeAdmin.auth.verifySessionCookie.mockImplementationOnce(async (_cookie: string, checkRevoked?: boolean) => {
+      if (checkRevoked) throw Object.assign(new Error('revoked'), { code: 'auth/session-cookie-revoked' })
+      return { uid: 'user-alice', email_verified: true }
+    })
+
+    const res = await POST(logoutRequest('__session=token-alice'))
+
+    expect(res.status).toBe(204)
+    expect(res.headers.get('set-cookie')).toBe(CLEARED)
+    expect(fakeAdmin.auth.revokeRefreshTokens).not.toHaveBeenCalled()
+    expect(errorSpy.mock.calls).toEqual([])
+  })
+
+  it('clears an expired cookie without revoking anything and without logging', async () => {
+    fakeAdmin.auth.verifySessionCookie.mockRejectedValueOnce(
+      Object.assign(new Error('expired'), { code: 'auth/session-cookie-expired' }),
+    )
+
+    const res = await POST(logoutRequest('__session=token-alice'))
+
+    expect(res.status).toBe(204)
+    expect(res.headers.get('set-cookie')).toBe(CLEARED)
+    expect(fakeAdmin.auth.revokeRefreshTokens).not.toHaveBeenCalled()
+    expect(errorSpy.mock.calls).toEqual([])
   })
 
   it('clears the cookie and answers 204 even without a session', async () => {
@@ -63,6 +92,20 @@ describe('POST /api/auth/logout', () => {
     expect(res.status).toBe(204)
     expect(res.headers.get('set-cookie')).toBe(CLEARED)
     expect(fakeAdmin.auth.revokeRefreshTokens).not.toHaveBeenCalled()
+  })
+
+  it('still clears the cookie when the session check has an outage, logging only the code', async () => {
+    fakeAdmin.auth.verifySessionCookie.mockRejectedValueOnce(
+      Object.assign(new Error('boom SECRET-BODY'), { code: 'auth/internal-error' }),
+    )
+
+    const res = await POST(logoutRequest('__session=token-alice'))
+
+    expect(res.status).toBe(204)
+    expect(res.headers.get('set-cookie')).toBe(CLEARED)
+    expect(fakeAdmin.auth.revokeRefreshTokens).not.toHaveBeenCalled()
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('SECRET-BODY')
+    expect(errorSpy).toHaveBeenCalledWith('logout revoke failed', 'auth/internal-error')
   })
 
   it('still clears the cookie when revocation fails, logging only the code', async () => {

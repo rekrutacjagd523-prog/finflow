@@ -172,6 +172,41 @@ test.describe('server session (emulators)', () => {
     expect(replay.status()).toBe(401)
   })
 
+  // Outcome check only. In emulator mode firebase-admin ALWAYS checks revocation
+  // (`if (checkRevoked || isEmulator)` in verifySessionCookie), so here the old
+  // verifySessionCookie(cookie, false) behaved like the fix and this test passes either way; the
+  // regression guard is tests/unit/api/auth/logout.test.ts.
+  test('a revoked cookie posted to logout does not revoke a newer session', async ({ page, request }) => {
+    const { email } = await registerViaUi(page)
+    const cookie1 = (await page.context().cookies()).find((c) => c.name === '__session')?.value
+    expect(cookie1).toBeTruthy()
+
+    // Sign out (revokes everything up to now), then sign in again: cookie2 is minted later.
+    await page.waitForTimeout(1_100)
+    await signOutViaSidebar(page)
+    await signInViaLoginForm(page, email)
+    await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
+    const cookie2 = (await page.context().cookies()).find((c) => c.name === '__session')?.value
+    expect(cookie2).toBeTruthy()
+    expect(cookie2).not.toBe(cookie1)
+
+    // A stale tab/device still holding cookie1 logs out. Revocation is second-granular, so wait a
+    // second first: a wrongful revocation would then be strictly newer than cookie2's sign-in.
+    await page.waitForTimeout(1_100)
+    const staleLogout = await request.post('/api/auth/logout', {
+      headers: { Cookie: `__session=${cookie1}`, Origin: ORIGIN },
+    })
+    expect(staleLogout.status()).toBe(204)
+
+    // cookie2 is still alive: it gets past the session check and stops at the verification gate.
+    const alive = await page.context().request.post('/api/enablebanking/session', {
+      headers: { Origin: ORIGIN },
+      data: VICTIM_BODY,
+    })
+    expect(alive.status()).toBe(403)
+    expect(await alive.json()).toEqual({ error: 'email_not_verified' })
+  })
+
   test('login ignores an off-site ?redirect= and honours the app return path after re-login', async ({ page }) => {
     const { email, orgId } = await registerViaUi(page)
     // Same second-granular revocation as above. Every later sign-in mints a NEW cookie whose

@@ -20,12 +20,16 @@ export async function POST(req: Request) {
   if (cookie) {
     try {
       const { auth } = getAdmin()
-      // No revocation check: an already revoked cookie still identifies its user.
-      const { uid } = await auth.verifySessionCookie(cookie, false)
+      // With the revocation check: only a live session may revoke. A stale tab or device holding
+      // an already revoked (or expired) cookie calls this too (after a 401, or when its SDK user
+      // vanished); revoking on its behalf would end the user's NEWER sessions, so it is only cleared.
+      const { uid } = await auth.verifySessionCookie(cookie, true)
       await auth.revokeRefreshTokens(uid)
     } catch (e) {
-      // Best effort: the cookie is cleared below regardless. A rejected (expired, garbage)
-      // cookie is a normal condition and not logged; anything else is, by code only.
+      // Best effort: the cookie is cleared below regardless. A rejected (revoked, expired,
+      // garbage) cookie is a normal condition and not logged; anything else is, by code only.
+      // During an outage of the session check nothing is revoked; acceptable, because the
+      // cookie is still cleared here and every API route re-checks the session.
       if (!isCredentialError(e)) console.error('logout revoke failed', errorKind(e))
     }
   }
