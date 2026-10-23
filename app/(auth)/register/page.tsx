@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { useOrg } from '@/lib/hooks/useOrg'
 import { createOrganization, getUserOrganizations } from '@/lib/firebase/firestore'
 
 const CURRENCIES = [
@@ -28,6 +29,7 @@ const CURRENCIES = [
 export default function RegisterPage() {
   const router = useRouter()
   const { signUp, signInGoogle } = useAuth()
+  const { switchOrg } = useOrg()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -42,6 +44,8 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { orgId } = await signUp(email, password, name, orgName, currency)
+      // OrgProvider's own load started when the user appeared, before this org existed.
+      await switchOrg(orgId)
       router.push(`/${orgId}/transactions`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed'
@@ -61,10 +65,12 @@ export default function RegisterPage() {
       const { user } = await signInGoogle()
       const existingOrgs = await getUserOrganizations(user.uid)
       if (existingOrgs.length > 0) {
+        await switchOrg(existingOrgs[0].id)
         router.push(`/${existingOrgs[0].id}/transactions`)
         return
       }
       const orgId = await createOrganization(user.uid, orgName, currency)
+      await switchOrg(orgId)
       router.push(`/${orgId}/transactions`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Google registration failed'
