@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -25,6 +26,8 @@ interface AccountsSidebarProps {
   variant?: 'panel' | 'drawer'
   /** Called after a choice that should close the drawer (account picked, form opened, link followed). */
   onNavigate?: () => void
+  /** `drawer` only: shown top right, where the panel has its collapse button (the drawer's close button). */
+  headerAction?: ReactNode
 }
 
 function rowClass(selected: boolean): string {
@@ -34,7 +37,7 @@ function rowClass(selected: boolean): string {
   )
 }
 
-export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSidebarProps) {
+export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }: AccountsSidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const {
@@ -165,10 +168,12 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
             </div>
           )}
         </div>
-        {variant === 'panel' && (
+        {variant === 'panel' ? (
           <Button variant="ghost" size="icon-sm" onClick={toggleSidebar} aria-label="Згорнути сайдбар" aria-expanded>
             <ChevronLeft />
           </Button>
+        ) : (
+          headerAction
         )}
       </div>
 

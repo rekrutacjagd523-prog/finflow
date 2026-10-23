@@ -12,8 +12,7 @@ import {
 } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { AccountForm } from '@/components/forms/AccountForm'
-import { TransactionForm } from '@/components/forms/TransactionForm'
+import { LazyAccountForm, LazyTransactionForm } from '@/components/forms/lazy'
 import { useAccounts } from '@/lib/hooks/useAccounts'
 import { useCategories } from '@/lib/hooks/useCategories'
 import { useOrg } from '@/lib/hooks/useOrg'
@@ -71,6 +70,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
   const selectedAccountId = effectiveSelection(selection.orgId === orgId ? selection.accountId : null, accounts)
 
   // The forms mount on open and unmount on close, so every opening starts from fresh form state.
+  // Their code is loaded on the first open (next/dynamic), not with every app route.
   const [transactionFormType, setTransactionFormType] = useState<TransactionType | null>(null)
   const [accountForm, setAccountForm] = useState<{ account: Account | null } | null>(null)
   // The drawer remembers the path it was opened on and closes as soon as the route changes
@@ -141,7 +141,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     <ShellContext.Provider value={value}>
       {children}
       {transactionFormType && (
-        <TransactionForm
+        <LazyTransactionForm
           key={transactionFormType}
           orgId={orgId}
           accounts={accounts}
@@ -153,7 +153,7 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
         />
       )}
       {accountForm && (
-        <AccountForm
+        <LazyAccountForm
           key={accountForm.account?.id ?? 'new'}
           orgId={orgId}
           account={accountForm.account ?? undefined}

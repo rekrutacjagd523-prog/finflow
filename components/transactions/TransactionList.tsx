@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ReceiptText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { TransactionForm } from '@/components/forms/TransactionForm'
+import { LazyTransactionForm } from '@/components/forms/lazy'
 import { cn } from '@/lib/utils'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/utils/accounts'
 import { formatCurrency } from '@/lib/utils/currency'
@@ -131,16 +131,15 @@ export function TransactionList({
                     tx.type === 'transfer' && tx.counterpartyId ? accountMap[tx.counterpartyId] : null
                   const category = tx.categoryId ? categoryMap[tx.categoryId] : null
                   const categoryName = category?.name ?? (tx.type === 'transfer' ? 'Переказ' : 'Без категорії')
+                  const accountLabel = toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')
 
                   return (
+                    // A click anywhere on the row edits it (mouse). Keyboard and screen readers use
+                    // the real button in the account cell: the row itself is not a Tab stop.
                     <TableRow
                       key={tx.id}
-                      tabIndex={0}
                       onClick={() => setEditTx(tx)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') setEditTx(tx)
-                      }}
-                      className="cursor-pointer hover:bg-canvas focus-visible:bg-brand-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-soft-foreground"
+                      className="cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft"
                     >
                       <TableCell className="hidden py-3.5 pl-4 tabular-nums sm:table-cell sm:pl-2">
                         <span className="block text-ink">{formatDayShortUtc(tx.date)}</span>
@@ -150,9 +149,20 @@ export function TransactionList({
                         {amountLabel(tx)}
                       </TableCell>
                       <TableCell className="py-3.5 pl-4 text-ink sm:pl-6">
-                        <span className="block max-w-44 truncate sm:max-w-56">
-                          {toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')}
-                        </span>
+                        {/* The account cell is the first cell visible at every width (the date is
+                            hidden on a phone), so the row's button lives here. Its name starts with
+                            the visible text and adds what tells the rows apart. */}
+                        <button
+                          type="button"
+                          aria-label={`${accountLabel}: ${amountLabel(tx)}, ${formatDayShortUtc(tx.date)}, редагувати`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setEditTx(tx)
+                          }}
+                          className="block max-w-44 truncate rounded-[4px] text-left text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground sm:max-w-56"
+                        >
+                          {accountLabel}
+                        </button>
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}
                         <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
@@ -187,7 +197,7 @@ export function TransactionList({
       </div>
 
       {editTx && (
-        <TransactionForm
+        <LazyTransactionForm
           orgId={orgId}
           accounts={accounts}
           incomeCategories={incomeCategories}

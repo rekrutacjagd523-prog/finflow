@@ -200,14 +200,18 @@ test.describe('app shell (emulators)', () => {
     await expect(page.getByRole('button', { name: 'Показати всі рахунки' })).toBeVisible()
   })
 
-  test('Enter on a journal row opens its edit form', async ({ page, request }) => {
+  test('Enter on the button of a journal row opens its edit form; the row itself is not a Tab stop', async ({ page, request }) => {
     const user = await registerViaUi(page, 'rowenter')
     await waitForShell(page, user.companyName)
     await seedJournal(request, user.orgId)
 
     const rowAlpha = page.getByRole('row').filter({ hasText: 'Оплата від Alpha' })
     await expect(rowAlpha).toBeVisible()
-    await rowAlpha.focus()
+    await expect(rowAlpha).not.toHaveAttribute('tabindex')
+    // One real button per row, named by the visible account plus the amount and the date.
+    const editButton = rowAlpha.getByRole('button', { name: /^Alpha: \+120,00.*, редагувати$/ })
+    await expect(editButton).toHaveCount(1)
+    await editButton.focus()
     await page.keyboard.press('Enter')
 
     const dialog = page.getByRole('dialog')
@@ -418,6 +422,13 @@ test.describe('app shell (emulators)', () => {
     await expect(openButton).toBeFocused()
     await expect(openButton).toHaveAttribute('aria-expanded', 'false')
 
+    // The visible close button (top right) closes it too and also gives focus back to ☰.
+    await openButton.click()
+    await expect(drawer).toBeVisible()
+    await drawer.getByRole('button', { name: 'Закрити', exact: true }).click()
+    await expect(drawer).toBeHidden()
+    await expect(openButton).toBeFocused()
+
     // Browser Back (a route change) closes an open drawer.
     await analyticsTab.click()
     await page.waitForURL(new RegExp(`/${user.orgId}/analytics/cashflow$`))
@@ -454,5 +465,56 @@ test.describe('app shell (emulators)', () => {
       return { background: style.backgroundColor, color: style.color }
     })
     expect(dialogColors).toEqual({ background: 'rgb(255, 255, 255)', color: 'rgb(23, 32, 29)' })
+  })
+})
+
+test.describe('settings pages (emulators)', () => {
+  test.skip(!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST, NEEDS_EMULATORS)
+
+  test('saving Компанія shows a light success toast and the header shows the new name', async ({ page }) => {
+    const user = await registerViaUi(page, 'company')
+    await page.goto(`/${user.orgId}/settings/company`)
+    await waitForShell(page, user.companyName)
+    // next-themes keeps a dark root on the landing default; toasts inside the app stay light.
+    await page.evaluate(() => document.documentElement.classList.add('dark'))
+
+    const nameField = page.getByLabel('Назва', { exact: true })
+    await expect(nameField).toHaveValue(user.companyName)
+    const newName = `Renamed Co ${Date.now()}`
+    await nameField.fill(newName)
+    await page.getByRole('button', { name: 'Зберегти', exact: true }).click()
+
+    await expect(page.getByText('Збережено', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'light')
+    await expect(page.getByTestId('org-switcher-name')).toHaveText(newName)
+  })
+
+  test('a category is added and then deleted on settings/categories', async ({ page }) => {
+    const user = await registerViaUi(page, 'categories')
+    await page.goto(`/${user.orgId}/settings/categories`)
+    await waitForShell(page, user.companyName)
+    const content = page.getByRole('main')
+    const name = `Тестова категорія ${Date.now()}`
+
+    await content.getByLabel('Назва категорії', { exact: true }).fill(name)
+    await content.getByRole('combobox', { name: 'Тип категорії' }).selectOption('expense')
+    await content.getByRole('button', { name: 'Додати', exact: true }).click()
+    await expect(page.getByText('Категорію додано', { exact: true })).toBeVisible()
+    await expect(content.getByText(name, { exact: true })).toBeVisible()
+
+    await content.getByRole('button', { name: `Видалити категорію ${name}`, exact: true }).click()
+    await expect(page.getByText('Видалено', { exact: true })).toBeVisible()
+    await expect(content.getByText(name, { exact: true })).toHaveCount(0)
+  })
+
+  test('the Підписка card shows the trial plan with its end date', async ({ page }) => {
+    const user = await registerViaUi(page, 'subscription')
+    await page.goto(`/${user.orgId}/settings/subscription`)
+    await waitForShell(page, user.companyName)
+    const content = page.getByRole('main')
+
+    await expect(content.getByText(/^trial plan$/i)).toBeVisible()
+    await expect(content.getByText(/^Trial до \S+$/)).toBeVisible()
+    await expect(content.getByRole('button', { name: 'Upgrade to Pro', exact: true })).toBeVisible()
   })
 })

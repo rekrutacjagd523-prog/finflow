@@ -1,20 +1,6 @@
 import type { Transaction } from '@/types'
 
-export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('uk-UA', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date)
-}
-
-export function formatDateShort(date: Date): string {
-  return new Intl.DateTimeFormat('uk-UA', {
-    day: 'numeric',
-    month: 'short',
-  }).format(date)
-}
-
+// Journal dates are formatted in lib/utils/journal.ts (UTC, like the grouping below).
 export function groupTransactionsByDate(txs: Transaction[]): Record<string, Transaction[]> {
   const groups: Record<string, Transaction[]> = {}
   const sorted = [...txs].sort((a, b) => b.date.getTime() - a.date.getTime())

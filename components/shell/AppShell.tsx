@@ -3,7 +3,9 @@
 import { useEffect, type ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
 import VerifyEmailBanner from '@/components/auth/VerifyEmailBanner'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AccountsSidebar } from '@/components/shell/AccountsSidebar'
 import { AppHeader } from '@/components/shell/AppHeader'
 import { ModuleTabs } from '@/components/shell/ModuleTabs'
@@ -62,7 +64,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="top-0 left-0 flex h-dvh max-h-dvh w-80 max-w-[calc(100%-3rem)] translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-r-panel p-0 duration-200 sm:max-w-[calc(100%-3rem)] lg:hidden data-open:zoom-in-100 data-open:slide-in-from-left data-closed:zoom-out-100 data-closed:slide-out-to-left motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none"
         >
           <DialogTitle className="sr-only">Рахунки</DialogTitle>
-          <AccountsSidebar variant="drawer" onNavigate={() => setDrawerOpen(false)} />
+          <AccountsSidebar
+            variant="drawer"
+            onNavigate={() => setDrawerOpen(false)}
+            headerAction={
+              // A visible way out besides Esc and the backdrop; Base UI returns focus to «☰».
+              <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label="Закрити" />}>
+                <X />
+              </DialogClose>
+            }
+          />
         </DialogContent>
       </Dialog>
     </div>

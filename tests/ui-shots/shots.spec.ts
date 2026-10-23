@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell } from '../e2e/helpers/app-ui'
@@ -11,6 +11,12 @@ const VIEWPORTS = [
 ] as const
 const DAY_MS = 24 * 60 * 60 * 1000
 const SETTINGS = ['company', 'categories', 'banks', 'subscription'] as const
+const ANALYTICS = [
+  { path: 'cashflow', heading: 'Cash Flow', charts: true },
+  { path: 'pl', heading: 'P&L — Прибутки та збитки', charts: true },
+  { path: 'balance', heading: 'Баланс', charts: false },
+  { path: 'calendar', heading: 'Календар', charts: false },
+] as const
 
 async function seedDemoData(request: APIRequestContext, orgId: string): Promise<void> {
   const base = `organizations/${orgId}`
@@ -88,6 +94,11 @@ test.describe('ui shots', () => {
   test('key screens at 1440x900 and 390x844 with a dark <html>', async ({ page, request }) => {
     test.setTimeout(300_000)
     mkdirSync(OUT_DIR, { recursive: true })
+    // Start from an empty folder: no stale images from an older list of screens. Removing also
+    // avoids a Windows quirk where overwriting a PNG that an image viewer holds open fails.
+    for (const old of readdirSync(OUT_DIR)) {
+      if (old.endsWith('.png')) rmSync(join(OUT_DIR, old), { force: true })
+    }
 
     await page.setViewportSize({ width: 1440, height: 900 })
     const user = await registerViaUi(page, 'shots')
@@ -130,11 +141,25 @@ test.describe('ui shots', () => {
         await page.getByRole('button', { name: 'Розгорнути сайдбар' }).click()
       }
 
-      await open('analytics/cashflow')
-      await expect(page.getByRole('heading', { name: 'Cash Flow' })).toBeVisible()
-      // Recharts animates its bars in JavaScript (not CSS), so let the animation finish.
-      await page.waitForTimeout(1500)
-      await shot('analytics-cashflow')
+      // Recharts animates in JavaScript (not CSS), so the chart pages wait for the animation.
+      for (const report of ANALYTICS) {
+        await open(`analytics/${report.path}`)
+        await expect(page.getByRole('heading', { name: report.heading })).toBeVisible()
+        await expect(page.getByRole('navigation', { name: 'Розділи аналітики' })).toBeVisible()
+        if (report.charts) await page.waitForTimeout(1500)
+        await shot(`analytics-${report.path}`)
+      }
+
+      // The way into settings: the profile menu, then the settings screen with its own menu.
+      await open('transactions')
+      await page.getByRole('button', { name: 'Профіль' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Налаштування' })).toBeVisible()
+      await shot('profile-menu')
+      await page.getByRole('menuitem', { name: 'Налаштування' }).click()
+      await page.waitForURL(new RegExp(`/${user.orgId}/settings/company$`))
+      await expect(page.getByRole('navigation', { name: 'Розділи налаштувань' })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'До платежів' })).toBeVisible()
+      await shot('settings-menu')
 
       for (const section of SETTINGS) {
         await open(`settings/${section}`)
