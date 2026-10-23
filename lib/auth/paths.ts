@@ -1,8 +1,8 @@
 // Path rules shared by proxy.ts (server) and AuthProvider (browser).
 // Pure on purpose: no imports, so it is safe in both bundles.
 
-export const PUBLIC_PATHS = ['/login', '/register', '/forgot-password']
-export const AUTH_PATHS = ['/login', '/register']
+export const PUBLIC_PATHS = ['/login', '/register', '/forgot-password'] as const
+export const AUTH_PATHS = ['/login', '/register'] as const
 
 const MAX_REDIRECT_LENGTH = 512
 
@@ -33,6 +33,17 @@ export function safeRedirectPath(raw: string | null | undefined): string | null 
   if (typeof raw !== 'string' || raw.length === 0 || raw.length > MAX_REDIRECT_LENGTH) return null
   if (!raw.startsWith('/') || raw.startsWith('//')) return null
   if (raw.includes('\\') || /[\u0000-\u001f\u007f]/.test(raw)) return null
-  if (raw === '/api' || raw.startsWith('/api/')) return null
+
+  // Resolve dot segments, query and hash the way the browser will, then decode, so inputs like
+  // `/./api/x`, `/%2e/api/x`, `/%61pi/x` or `/api?x=1` cannot dodge the API-path rule.
+  let pathname: string
+  try {
+    const url = new URL(raw, 'http://x')
+    if (url.origin !== 'http://x') return null
+    pathname = decodeURIComponent(url.pathname)
+  } catch {
+    return null
+  }
+  if (pathname === '/api' || pathname.startsWith('/api/')) return null
   return raw
 }
