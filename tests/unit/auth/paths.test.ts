@@ -5,20 +5,34 @@ describe('isPublicPath', () => {
   it.each(['/login', '/register', '/forgot-password', '/login/extra'])('is true for %s', (p) => {
     expect(isPublicPath(p)).toBe(true)
   })
-  it.each(['/', '/pricing', '/org1/transactions'])('is false for %s', (p) => {
+  it.each([
+    '/',
+    '/pricing',
+    '/org1/transactions',
+    '/login-foo',
+    '/loginx/transactions',
+    '/registerx',
+    '/forgot-password2',
+  ])('is false for %s', (p) => {
     expect(isPublicPath(p)).toBe(false)
   })
 })
 
 describe('isAuthPath', () => {
   it.each(['/login', '/register'])('is true for %s', (p) => expect(isAuthPath(p)).toBe(true))
-  it.each(['/forgot-password', '/', '/org1/settings'])('is false for %s', (p) => {
+  it.each(['/forgot-password', '/', '/org1/settings', '/login-foo', '/registerx'])('is false for %s', (p) => {
     expect(isAuthPath(p)).toBe(false)
   })
 })
 
 describe('isAppPath', () => {
-  it.each(['/org1/transactions', '/Ab_c-9/settings', '/org1/analytics/cashflow'])('is true for %s', (p) => {
+  it.each([
+    '/org1/transactions',
+    '/Ab_c-9/settings',
+    '/org1/analytics/cashflow',
+    '/loginabc/transactions',
+    '/register1/settings',
+  ])('is true for %s', (p) => {
     expect(isAppPath(p)).toBe(true)
   })
   it.each(['/', '/login', '/login/x', '/register', '/forgot-password', '/pricing', '/org1', '//evil/x'])(

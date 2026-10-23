@@ -6,12 +6,17 @@ export const AUTH_PATHS = ['/login', '/register']
 
 const MAX_REDIRECT_LENGTH = 512
 
+// Match on a segment boundary: `/login` and `/login/x` match, `/login1234/x` (an org slug) does not.
+function matchesPath(pathname: string, entries: readonly string[]): boolean {
+  return entries.some((p) => pathname === p || pathname.startsWith(p + '/'))
+}
+
 export function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((p) => pathname.startsWith(p))
+  return matchesPath(pathname, PUBLIC_PATHS)
 }
 
 export function isAuthPath(pathname: string): boolean {
-  return AUTH_PATHS.some((p) => pathname.startsWith(p))
+  return matchesPath(pathname, AUTH_PATHS)
 }
 
 /** `/<segment>/...`: the organization-scoped app area (same rule the pre-S01 proxy used). */
