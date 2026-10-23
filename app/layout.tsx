@@ -33,7 +33,9 @@ export default function RootLayout({
   return (
     <html lang="uk" className={`${unbounded.variable} ${manrope.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        {/* enableColorScheme={false}: color-scheme comes from app/globals.css (`.dark`, and light
+            under :root:has(.app-shell)); an inline one on <html> would beat the app shell's. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} enableColorScheme={false}>
           <AuthProvider>
             <OrgProvider>
               {children}

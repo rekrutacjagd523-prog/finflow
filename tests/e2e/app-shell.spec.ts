@@ -468,7 +468,98 @@ test.describe('app shell (emulators)', () => {
     })
     expect(dialogColors).toEqual({ background: 'rgb(255, 255, 255)', color: 'rgb(23, 32, 29)' })
   })
+
+  // Production report: the open profile menu was hidden behind the sticky module tabs (z-10) down to
+  // their bottom edge, i.e. painted as if the popup had no z-index of its own. The shell is now an
+  // isolated stacking context, so portalled layers stay above it even then (simulated below).
+  test('at 1920x920 under a dark <html> the profile menu and the company switcher are readable and on top', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 920 })
+    const user = await registerViaUi(page, 'menus')
+    await waitForShell(page, user.companyName)
+    await page.evaluate(() => document.documentElement.classList.add('dark'))
+    await expect(page.locator('html')).toHaveClass(/(^|\s)dark(\s|$)/)
+
+    const menus = [
+      { name: 'profile', trigger: page.getByRole('button', { name: 'Профіль' }), overTabs: true },
+      { name: 'company switcher', trigger: page.getByTestId('org-switcher'), overTabs: false },
+    ]
+    for (const menu of menus) {
+      await menu.trigger.click()
+      const popup = page.locator('[data-slot="dropdown-menu-content"]')
+      await expect(popup).toBeVisible()
+      // Fully faded in: visibility never depends on an animation that is still running.
+      await expect.poll(() => popup.evaluate((el) => getComputedStyle(el).opacity)).toBe('1')
+      expect(await popup.evaluate((el) => getComputedStyle(el).colorScheme), `${menu.name}: color-scheme`).toBe('light')
+
+      const before = await popup.evaluate(inspectMenuItems)
+      expect(before.length, `${menu.name}: items`).toBeGreaterThanOrEqual(2)
+      for (const item of before) {
+        expect(item.contrast, `${menu.name}: «${item.text}» contrast`).toBeGreaterThanOrEqual(4.5)
+        expect(item.topmost, `${menu.name}: «${item.text}» is covered by ${item.covering}`).toBe(true)
+      }
+      // The profile menu really overlaps the sticky tabs, so the next check is meaningful there.
+      if (menu.overTabs) expect(before.some((item) => item.overTabs), `${menu.name} overlaps the tabs`).toBe(true)
+
+      // The production picture: the popup's own z-index lost. It must still paint above the shell.
+      await popup.evaluate((el) => {
+        ;(el.parentElement as HTMLElement).style.zIndex = 'auto'
+      })
+      for (const item of await popup.evaluate(inspectMenuItems)) {
+        expect(item.topmost, `${menu.name} without z-index: «${item.text}» is covered by ${item.covering}`).toBe(true)
+      }
+      await page.keyboard.press('Escape')
+      await expect(popup).toHaveCount(0)
+    }
+  })
 })
+
+/**
+ * Runs in the page on an open dropdown menu popup: for each item and group label, the WCAG contrast of
+ * its text colour against the first opaque background behind it, whether the element at its centre
+ * is the item itself (nothing covers it) and whether that centre lies over the sticky module tabs.
+ */
+function inspectMenuItems(popup: Element) {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 1
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+  // Any CSS colour syntax (rgb, lab, oklch…) to sRGB through the canvas.
+  const rgba = (color: string) => {
+    ctx.clearRect(0, 0, 1, 1)
+    ctx.fillStyle = '#000'
+    ctx.fillStyle = color
+    ctx.fillRect(0, 0, 1, 1)
+    return Array.from(ctx.getImageData(0, 0, 1, 1).data)
+  }
+  const luminance = ([r, g, b]: number[]) => {
+    const lin = (c: number) => {
+      const s = c / 255
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    }
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+  }
+  const background = (el: Element | null): number[] => {
+    for (let node = el; node; node = node.parentElement) {
+      const color = rgba(getComputedStyle(node).backgroundColor)
+      if (color[3] === 255) return color
+    }
+    return [255, 255, 255, 255]
+  }
+  const tabs = document.querySelector('nav[aria-label="Модулі"]')?.getBoundingClientRect()
+  return [...popup.querySelectorAll('[role="menuitem"], [data-slot="dropdown-menu-label"]')].map((el) => {
+    const rect = el.getBoundingClientRect()
+    const x = rect.x + rect.width / 2
+    const y = rect.y + rect.height / 2
+    const top = document.elementFromPoint(x, y)
+    const [l1, l2] = [luminance(rgba(getComputedStyle(el).color)), luminance(background(el))].sort((a, b) => b - a)
+    return {
+      text: (el.textContent ?? '').trim(),
+      contrast: Math.round(((l1 + 0.05) / (l2 + 0.05)) * 100) / 100,
+      topmost: !!top && (top === el || el.contains(top)),
+      covering: top ? `${top.tagName.toLowerCase()}.${top.getAttribute('class') ?? ''}`.slice(0, 80) : 'nothing',
+      overTabs: !!tabs && x >= tabs.left && x <= tabs.right && y >= tabs.top && y <= tabs.bottom,
+    }
+  })
+}
 
 /**
  * Report data relative to the real current date (the app reads the browser clock), in UTC like

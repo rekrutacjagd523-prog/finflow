@@ -34,7 +34,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [setDrawerOpen])
 
   return (
-    <div className="app-shell flex h-dvh flex-col bg-canvas text-ink">
+    // `isolate`: the shell is one stacking context, so its inner z-indices (the sticky module tabs'
+    // z-10) cannot compete with the menus, selects and dialogs portalled to <body> after it. Even a
+    // popup whose own z-index is lost then paints above the whole shell (tree order).
+    <div className="app-shell isolate flex h-dvh flex-col bg-canvas text-ink">
       <AppHeader />
       <div className="flex min-h-0 flex-1 lg:px-3 lg:pb-3">
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden border-t border-line bg-surface lg:rounded-panel lg:border lg:shadow-panel">
