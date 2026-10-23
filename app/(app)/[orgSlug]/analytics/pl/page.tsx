@@ -7,6 +7,7 @@ import { useTransactions } from '@/lib/hooks/useTransactions'
 import { useShell } from '@/lib/hooks/useShell'
 import { buildPL } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
+import { cn } from '@/lib/utils'
 import PLTable from '@/components/charts/PLTable'
 import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
 import { Download, ArrowLeft } from 'lucide-react'
@@ -30,6 +31,7 @@ export default function PLPage() {
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
   const { transactions, loading: txLoading } = useTransactions(orgId)
+  // Categories come from ShellProvider (one subscription, one default-category seed per org).
   const { incomeCategories, expenseCategories, categoriesLoading: catLoading } = useShell()
   const categories = [...incomeCategories, ...expenseCategories]
   const [period, setPeriod] = useState(6)
@@ -56,25 +58,26 @@ export default function PLPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb] p-6 md:p-10">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="px-4 py-5 lg:px-6 lg:py-6">
+      <div className="mx-auto max-w-6xl space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link
             href={`/${orgSlug}/analytics`}
-            className="p-2 rounded-lg hover:bg-white transition-colors text-[#6b7280] hover:text-[#111111]"
+            aria-label="Усі звіти"
+            className="rounded-control p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-[#111111]">P&L — Прибутки та збитки</h1>
-            <p className="text-sm text-[#6b7280]">По категоріях за обраний період</p>
+            <h1 className="font-display text-xl font-semibold text-ink">P&L — Прибутки та збитки</h1>
+            <p className="text-sm text-ink-muted">По категоріях за обраний період</p>
           </div>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e5e7eb] bg-white text-sm text-[#111111] hover:bg-[#f9fafb] transition-colors"
+            className="flex items-center gap-2 rounded-control border border-line bg-surface px-4 py-2 text-sm text-ink transition-colors hover:bg-canvas"
           >
-            <Download className="w-4 h-4" />
+            <Download className="h-4 w-4" />
             Експорт CSV
           </button>
         </div>
@@ -85,12 +88,12 @@ export default function PLPage() {
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
-              className={[
-                'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
+              className={cn(
+                'rounded-control px-4 py-1.5 text-sm font-medium transition-colors',
                 period === p.value
-                  ? 'bg-[#00c896] text-white'
-                  : 'bg-white border border-[#e5e7eb] text-[#6b7280] hover:text-[#111111]',
-              ].join(' ')}
+                  ? 'bg-brand text-white'
+                  : 'border border-line bg-surface text-ink-muted hover:text-ink',
+              )}
             >
               {p.label}
             </button>
@@ -103,6 +106,6 @@ export default function PLPage() {
         {/* Table */}
         <PLTable rows={rows} monthKeys={monthKeys} loading={loading} />
       </div>
-    </main>
+    </div>
   )
 }

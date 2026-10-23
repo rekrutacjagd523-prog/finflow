@@ -28,19 +28,20 @@ export default function CalendarPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb] p-6 md:p-10">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="px-4 py-5 lg:px-6 lg:py-6">
+      <div className="mx-auto max-w-3xl space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link
             href={`/${orgSlug}/analytics`}
-            className="p-2 rounded-lg hover:bg-white transition-colors text-[#6b7280] hover:text-[#111111]"
+            aria-label="Усі звіти"
+            className="rounded-control p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-[#111111]">Календар</h1>
-            <p className="text-sm text-[#6b7280]">Щоденний рух грошей</p>
+            <h1 className="font-display text-xl font-semibold text-ink">Календар</h1>
+            <p className="text-sm text-ink-muted">Щоденний рух грошей</p>
           </div>
         </div>
 
@@ -53,6 +54,6 @@ export default function CalendarPage() {
           loading={loading}
         />
       </div>
-    </main>
+    </div>
   )
 }

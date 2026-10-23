@@ -30,38 +30,39 @@ export default function BalancePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb] p-6 md:p-10">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <div className="px-4 py-5 lg:px-6 lg:py-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
           <Link
             href={`/${orgSlug}/analytics`}
-            className="p-2 rounded-lg hover:bg-white transition-colors text-[#6b7280] hover:text-[#111111]"
+            aria-label="Усі звіти"
+            className="rounded-control p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-[#111111]">Баланс</h1>
-            <p className="text-sm text-[#6b7280]">
+            <h1 className="font-display text-xl font-semibold text-ink">Баланс</h1>
+            <p className="text-sm text-ink-muted">
               Активи та капітал{org?.name ? ` · ${org.name}` : ''}
             </p>
           </div>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e5e7eb] bg-white text-sm text-[#111111] hover:bg-[#f9fafb] transition-colors"
+            className="flex items-center gap-2 rounded-control border border-line bg-surface px-4 py-2 text-sm text-ink transition-colors hover:bg-canvas"
           >
-            <Download className="w-4 h-4" />
+            <Download className="h-4 w-4" />
             Експорт CSV
           </button>
         </div>
 
         {/* Period dropdown */}
         <div className="flex items-center gap-3">
-          <span className="text-sm text-[#6b7280]">Станом на:</span>
+          <span className="text-sm text-ink-muted">Станом на:</span>
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-[#e5e7eb] bg-white text-sm text-[#111111] focus:outline-none focus:border-[#00c896]"
+            className="rounded-control border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand focus:outline-none"
           >
             {PERIODS.map((p) => (
               <option key={p} value={p}>{p}</option>
@@ -72,6 +73,6 @@ export default function BalancePage() {
         {/* Balance sheet */}
         <BalanceSheet accounts={accounts} orgId={orgId ?? 'default'} loading={loading} />
       </div>
-    </main>
+    </div>
   )
 }
