@@ -1,0 +1,427 @@
+import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test'
+import { registerViaUi, waitForShell } from './helpers/app-ui'
+import { signInEmulatorUser } from './helpers/emulator-auth'
+import { seedDoc } from './helpers/emulator-firestore'
+
+const NEEDS_EMULATORS =
+  'Needs the Auth + Firestore emulators. Run: firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function accountsSidebar(page: Page) {
+  return page.getByRole('complementary', { name: 'Рахунки' })
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function seedAccount(
+  request: APIRequestContext,
+  orgId: string,
+  id: string,
+  data: { name: string; balance: number; currency: string; color?: string },
+): Promise<void> {
+  await seedDoc(request, `organizations/${orgId}/accounts`, id, {
+    name: data.name,
+    type: 'bank',
+    balance: data.balance,
+    currency: data.currency,
+    color: data.color ?? '#00c896',
+    orgId,
+    createdAt: new Date(),
+  })
+}
+
+async function seedIncome(
+  request: APIRequestContext,
+  orgId: string,
+  id: string,
+  accountId: string,
+  amount: number,
+  description: string,
+): Promise<void> {
+  await seedDoc(request, `organizations/${orgId}/transactions`, id, {
+    type: 'income',
+    accountId,
+    amount,
+    currency: 'UAH',
+    date: new Date(),
+    description,
+    isRecurring: false,
+    tags: [],
+    fileUrls: [],
+    orgId,
+    createdAt: new Date(),
+  })
+}
+
+/** Two UAH accounts with one income each, plus a EUR account (left out of the company total). */
+async function seedJournal(request: APIRequestContext, orgId: string): Promise<void> {
+  await seedAccount(request, orgId, 'acc-alpha', { name: 'Alpha', balance: 300, currency: 'UAH' })
+  await seedAccount(request, orgId, 'acc-beta', { name: 'Beta', balance: 450.5, currency: 'UAH', color: '#6366f1' })
+  await seedAccount(request, orgId, 'acc-euro', { name: 'Euro', balance: 200, currency: 'EUR', color: '#f59e0b' })
+  await seedIncome(request, orgId, 'tx-alpha', 'acc-alpha', 120, 'Оплата від Alpha')
+  await seedIncome(request, orgId, 'tx-beta', 'acc-beta', 80, 'Оплата від Beta')
+}
+
+/** The select button of an account row in the sidebar (the row also holds the «Дії з рахунком» menu). */
+function accountButton(scope: Locator, name: string) {
+  return scope.getByRole('listitem').filter({ hasText: name }).getByRole('button').first()
+}
+
+test.describe('app shell (emulators)', () => {
+  test.skip(!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST, NEEDS_EMULATORS)
+
+  test('module tabs follow the path; Tab and Enter navigate between them', async ({ page }) => {
+    const user = await registerViaUi(page, 'tabs')
+    await waitForShell(page, user.companyName)
+    const tabs = page.getByRole('navigation', { name: 'Модулі' })
+    const payments = tabs.getByRole('link', { name: 'Платежі' })
+    const analytics = tabs.getByRole('link', { name: 'Аналітика' })
+
+    await expect(payments).toHaveAttribute('aria-current', 'page')
+    await expect(analytics).not.toHaveAttribute('aria-current', 'page')
+
+    // Keyboard: focus «Платежі», Tab to «Аналітика», Enter follows the link.
+    await payments.focus()
+    await page.keyboard.press('Tab')
+    await expect(analytics).toBeFocused()
+    await page.keyboard.press('Enter')
+    await page.waitForURL(new RegExp(`/${user.orgId}/analytics/cashflow$`))
+    await expect(analytics).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('heading', { name: 'Cash Flow' })).toBeVisible()
+
+    // Analytics sub-pages keep the tab active.
+    await page.goto(`/${user.orgId}/analytics/pl`)
+    await waitForShell(page, user.companyName)
+    await expect(analytics).toHaveAttribute('aria-current', 'page')
+
+    await payments.click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
+    await expect(payments).toHaveAttribute('aria-current', 'page')
+
+    // Settings is not a module: no tab is current there.
+    await page.goto(`/${user.orgId}/settings/company`)
+    await waitForShell(page, user.companyName)
+    await expect(tabs.locator('[aria-current="page"]')).toHaveCount(0)
+  })
+
+  test('the sidebar collapses and stays collapsed after a reload', async ({ page }) => {
+    const user = await registerViaUi(page, 'collapse')
+    await waitForShell(page, user.companyName)
+    const sidebar = page.getByTestId('accounts-sidebar')
+
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'false')
+    await page.getByRole('button', { name: 'Згорнути сайдбар' }).click()
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'true')
+
+    await page.reload()
+    await waitForShell(page, user.companyName)
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'true')
+
+    await page.getByRole('button', { name: 'Розгорнути сайдбар' }).click()
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'false')
+    await page.reload()
+    await waitForShell(page, user.companyName)
+    await expect(sidebar).toHaveAttribute('data-collapsed', 'false')
+  })
+
+  test('choosing an account in the sidebar filters the journal; the total counts only the company currency', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'filter')
+    await waitForShell(page, user.companyName)
+    await seedJournal(request, user.orgId)
+
+    const sidebar = accountsSidebar(page)
+    await expect(sidebar.getByRole('listitem').filter({ hasText: 'Euro' })).toBeVisible()
+
+    // Registration uses UAH. Total = 300 + 450.50; the EUR account is neither added nor mentioned.
+    await expect(sidebar.getByText('Разом у UAH', { exact: true })).toBeVisible()
+    await expect(page.getByTestId('accounts-total')).toContainText('750,50')
+    await expect(page.getByTestId('accounts-summary')).not.toContainText('EUR')
+
+    const rowAlpha = page.getByRole('row').filter({ hasText: 'Оплата від Alpha' })
+    const rowBeta = page.getByRole('row').filter({ hasText: 'Оплата від Beta' })
+    await expect(rowAlpha).toBeVisible()
+    await expect(rowBeta).toBeVisible()
+
+    await accountButton(sidebar, 'Alpha').click()
+    await expect(rowAlpha).toBeVisible()
+    await expect(rowBeta).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Показати всі рахунки' })).toBeVisible()
+
+    await sidebar.getByRole('button', { name: /^Усі рахунки/ }).click()
+    await expect(rowAlpha).toBeVisible()
+    await expect(rowBeta).toBeVisible()
+  })
+
+  test('the toolbar account select and the sidebar selection are one state', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'sync')
+    await waitForShell(page, user.companyName)
+    await seedJournal(request, user.orgId)
+
+    const sidebar = accountsSidebar(page)
+    const select = page.getByRole('combobox', { name: 'Рахунок', exact: true })
+    const allAccounts = sidebar.getByRole('button', { name: /^Усі рахунки/ })
+    const rowAlpha = page.getByRole('row').filter({ hasText: 'Оплата від Alpha' })
+    const rowBeta = page.getByRole('row').filter({ hasText: 'Оплата від Beta' })
+    await expect(rowAlpha).toBeVisible()
+    await expect(rowBeta).toBeVisible()
+
+    // Sidebar -> select.
+    await accountButton(sidebar, 'Alpha').click()
+    await expect(select).toHaveValue('acc-alpha')
+    await expect(rowBeta).toHaveCount(0)
+
+    // Select -> sidebar.
+    await select.selectOption({ label: 'Beta' })
+    await expect(accountButton(sidebar, 'Beta')).toHaveAttribute('aria-pressed', 'true')
+    await expect(accountButton(sidebar, 'Alpha')).toHaveAttribute('aria-pressed', 'false')
+    await expect(rowBeta).toBeVisible()
+    await expect(rowAlpha).toHaveCount(0)
+
+    // «Очистити» clears the sidebar selection too.
+    await page.getByRole('button', { name: 'Очистити', exact: true }).click()
+    await expect(allAccounts).toHaveAttribute('aria-pressed', 'true')
+    await expect(accountButton(sidebar, 'Beta')).toHaveAttribute('aria-pressed', 'false')
+    await expect(select).toHaveValue('_all')
+    await expect(rowAlpha).toBeVisible()
+    await expect(rowBeta).toBeVisible()
+
+    // Choosing an account from another module leads to the journal, filtered by it.
+    await page.getByRole('navigation', { name: 'Модулі' }).getByRole('link', { name: 'Аналітика' }).click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/analytics/cashflow$`))
+    await accountButton(sidebar, 'Beta').click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
+    await expect(rowBeta).toBeVisible()
+    await expect(rowAlpha).toHaveCount(0)
+    await expect(select).toHaveValue('acc-beta')
+    await expect(page.getByRole('button', { name: 'Показати всі рахунки' })).toBeVisible()
+  })
+
+  test('Enter on a journal row opens its edit form', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'rowenter')
+    await waitForShell(page, user.companyName)
+    await seedJournal(request, user.orgId)
+
+    const rowAlpha = page.getByRole('row').filter({ hasText: 'Оплата від Alpha' })
+    await expect(rowAlpha).toBeVisible()
+    await rowAlpha.focus()
+    await page.keyboard.press('Enter')
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Редагувати транзакцію', { exact: true })).toBeVisible()
+    await expect(dialog.getByRole('tab', { name: 'Дохід' })).toHaveAttribute('aria-selected', 'true')
+    await expect(dialog.getByRole('tabpanel').getByLabel('Сума', { exact: true })).toHaveValue('120')
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+  })
+
+  test('header buttons open the operation form on payments, analytics and settings pages', async ({ page }) => {
+    const user = await registerViaUi(page, 'header')
+    await waitForShell(page, user.companyName)
+
+    const cases = [
+      { path: 'transactions', button: 'Дохід' },
+      { path: 'analytics/cashflow', button: 'Витрата' },
+      { path: 'settings/company', button: 'Переказ' },
+    ]
+    for (const { path, button } of cases) {
+      await page.goto(`/${user.orgId}/${path}`)
+      await waitForShell(page, user.companyName)
+      await page.getByRole('button', { name: button, exact: true }).click()
+      const dialog = page.getByRole('dialog')
+      await expect(dialog.getByText('Нова транзакція', { exact: true })).toBeVisible()
+      await expect(dialog.getByRole('tab', { name: button })).toHaveAttribute('aria-selected', 'true')
+      await page.keyboard.press('Escape')
+      await expect(dialog).toBeHidden()
+    }
+  })
+
+  test('settings: four sections in the menu; the old URL redirects to Company with its query', async ({ page }) => {
+    const user = await registerViaUi(page, 'settings')
+    await waitForShell(page, user.companyName)
+
+    await page.goto(`/${user.orgId}/settings?from=e2e`)
+    await page.waitForURL(new RegExp(`/${user.orgId}/settings/company\\?from=e2e$`))
+
+    const menu = page.getByRole('navigation', { name: 'Розділи налаштувань' })
+    await expect(menu.getByRole('link')).toHaveText(['Компанія', 'Категорії', 'Банки', 'Підписка'])
+
+    const sections = [
+      { link: 'Компанія', path: 'company', marker: page.getByLabel('Назва', { exact: true }) },
+      { link: 'Категорії', path: 'categories', marker: page.getByText('Додати категорію', { exact: true }) },
+      { link: 'Банки', path: 'banks', marker: page.getByRole('button', { name: 'Підключити банк' }) },
+      { link: 'Підписка', path: 'subscription', marker: page.getByText(/trial plan/i) },
+    ]
+    for (const { link, path, marker } of sections) {
+      await menu.getByRole('link', { name: link }).click()
+      await page.waitForURL(new RegExp(`/${user.orgId}/settings/${path}$`))
+      await expect(menu.getByRole('link', { name: link })).toHaveAttribute('aria-current', 'page')
+      await expect(marker).toBeVisible()
+    }
+  })
+
+  test('the company switcher lists both organizations and switches between them without flicker', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'switch')
+    await waitForShell(page, user.companyName)
+    const { uid } = await signInEmulatorUser(request, user.email, user.password)
+
+    // A second company owned by the same user (there is no UI to create one before S16).
+    const orgBId = `e2eorgb${Date.now()}`
+    const orgBName = `Second Co ${Date.now()}`
+    await seedDoc(request, 'organizations', orgBId, {
+      name: orgBName,
+      currency: 'EUR',
+      ownerId: uid,
+      plan: 'trial',
+      trialEndsAt: new Date(Date.now() + 14 * DAY_MS),
+      createdAt: new Date(),
+      members: { [uid]: { role: 'owner' } },
+    })
+
+    // Record every company name the header shows ('' while it shows the loading placeholder), so
+    // a switch that bounces back to the previous company (the flicker chooseOrg prevents) is caught.
+    // Client-side navigation keeps the window, so the observer survives the switch.
+    await page.evaluate(() => {
+      const w = window as unknown as { __orgNames: string[] }
+      w.__orgNames = []
+      const record = () => {
+        const name = document.querySelector('[data-testid="org-switcher-name"]')?.textContent ?? ''
+        if (w.__orgNames[w.__orgNames.length - 1] !== name) w.__orgNames.push(name)
+      }
+      record()
+      new MutationObserver(record).observe(document.body, { subtree: true, childList: true, characterData: true })
+    })
+    const shownNames = () => page.evaluate(() => (window as unknown as { __orgNames: string[] }).__orgNames)
+    const switcherName = page.getByTestId('org-switcher-name')
+
+    // The flicker needs company B's document to load before the route reaches /<B>/…, which a
+    // fast local route usually prevents. Force that order: hold B's journal request until
+    // switchOrg has loaded B (it then stores B as the last org). A condition, not a delay.
+    let heldUntilLoaded = false
+    await page.route(
+      (url) => url.pathname === `/${orgBId}/transactions`,
+      async (route) => {
+        await expect
+          .poll(() => page.evaluate((key) => localStorage.getItem(key), `lastOrgId_${uid}`))
+          .toBe(orgBId)
+        heldUntilLoaded = true
+        await route.continue()
+      },
+    )
+
+    await page.getByTestId('org-switcher').click()
+    await expect(page.getByRole('menuitem', { name: new RegExp(escapeRegExp(user.companyName)) })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: new RegExp(escapeRegExp(orgBName)) })).toBeVisible()
+    await page.getByRole('menuitem', { name: new RegExp(escapeRegExp(orgBName)) }).click()
+    await page.waitForURL(new RegExp(`/${orgBId}/transactions$`))
+    await expect(switcherName).toHaveText(orgBName)
+    await expect(accountsSidebar(page).getByText('Разом у EUR', { exact: true })).toBeVisible()
+    await expect(accountsSidebar(page).getByText('Рахунків ще немає', { exact: true })).toBeVisible()
+    // Apart from the placeholder in between, the header shows the old company, then the new one,
+    // once each: no bounce back to the old company before or after the new one appears.
+    const named = (names: string[]) => names.filter((name) => name !== '')
+    expect(named(await shownNames())).toEqual([user.companyName, orgBName])
+    expect(heldUntilLoaded).toBe(true)
+    await page.unrouteAll()
+
+    await page.getByTestId('org-switcher').click()
+    await page.getByRole('menuitem', { name: new RegExp(escapeRegExp(user.companyName)) }).click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
+    await expect(switcherName).toHaveText(user.companyName)
+    await expect(accountsSidebar(page).getByText('Разом у UAH', { exact: true })).toBeVisible()
+    expect(named(await shownNames())).toEqual([user.companyName, orgBName, user.companyName])
+  })
+
+  test('the account row menu edits and deletes an account', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'rowmenu')
+    await waitForShell(page, user.companyName)
+    await seedAccount(request, user.orgId, 'acc-edit', { name: 'Old name', balance: 100, currency: 'UAH' })
+    const sidebar = accountsSidebar(page)
+    await expect(sidebar.getByText('Old name', { exact: true })).toBeVisible()
+
+    await sidebar.getByRole('button', { name: 'Дії з рахунком Old name' }).click()
+    await page.getByRole('menuitem', { name: 'Редагувати' }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Редагувати рахунок', { exact: true })).toBeVisible()
+    await dialog.getByLabel('Назва', { exact: true }).fill('New name')
+    await dialog.getByRole('button', { name: 'Зберегти', exact: true }).click()
+    await expect(dialog).toBeHidden()
+    await expect(sidebar.getByText('New name', { exact: true })).toBeVisible()
+
+    page.once('dialog', (confirmDialog) => void confirmDialog.accept())
+    await sidebar.getByRole('button', { name: 'Дії з рахунком New name' }).click()
+    await page.getByRole('menuitem', { name: 'Видалити' }).click()
+    await expect(sidebar.getByText('New name', { exact: true })).toHaveCount(0)
+  })
+
+  test('on a 390 px phone the accounts open in a drawer: focus inside, Esc and Back close it, a choice closes it', async ({ page, request }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const user = await registerViaUi(page, 'drawer')
+    await waitForShell(page, user.companyName)
+    await seedAccount(request, user.orgId, 'acc-phone', { name: 'Phone account', balance: 50, currency: 'UAH' })
+
+    await expect(accountsSidebar(page)).toBeHidden()
+    // Header buttons are icon-only here but keep their names.
+    await expect(page.getByRole('button', { name: 'Дохід', exact: true })).toBeVisible()
+
+    const openButton = page.getByRole('button', { name: 'Відкрити рахунки' })
+    const drawer = page.getByTestId('accounts-drawer')
+    const analyticsTab = page.getByRole('navigation', { name: 'Модулі' }).getByRole('link', { name: 'Аналітика' })
+    await expect(openButton).toHaveAttribute('aria-expanded', 'false')
+
+    // Keyboard: Enter opens, focus moves inside, Esc closes and gives focus back to ☰.
+    await openButton.focus()
+    await page.keyboard.press('Enter')
+    await expect(drawer.getByRole('button', { name: /^Усі рахунки/ })).toBeVisible()
+    // The modal drawer hides the rest of the page from the accessibility tree, so the role
+    // locator cannot reach ☰ while it is open; read the attribute through a CSS locator.
+    await expect(page.locator('button[aria-label="Відкрити рахунки"]')).toHaveAttribute('aria-expanded', 'true')
+    await expect
+      .poll(() => page.evaluate(() => !!document.activeElement?.closest('[data-testid="accounts-drawer"]')))
+      .toBe(true)
+
+    await page.keyboard.press('Escape')
+    await expect(drawer).toBeHidden()
+    await expect(openButton).toBeFocused()
+    await expect(openButton).toHaveAttribute('aria-expanded', 'false')
+
+    // Browser Back (a route change) closes an open drawer.
+    await analyticsTab.click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/analytics/cashflow$`))
+    await openButton.click()
+    await expect(drawer).toBeVisible()
+    await page.goBack()
+    await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
+    await expect(drawer).toBeHidden()
+
+    // Choosing an account closes the drawer; from Analytics it leads to the filtered journal.
+    await analyticsTab.click()
+    await page.waitForURL(new RegExp(`/${user.orgId}/analytics/cashflow$`))
+    await openButton.click()
+    await accountButton(drawer, 'Phone account').click()
+    await expect(drawer).toBeHidden()
+    await page.waitForURL(new RegExp(`/${user.orgId}/transactions$`))
+    await expect(page.getByRole('button', { name: 'Показати всі рахунки' })).toBeVisible()
+  })
+
+  test('a dark <html> does not darken the shell or its dialogs', async ({ page }) => {
+    const user = await registerViaUi(page, 'dark')
+    await waitForShell(page, user.companyName)
+
+    await page.evaluate(() => document.documentElement.classList.add('dark'))
+    await expect(page.locator('html')).toHaveClass(/(^|\s)dark(\s|$)/)
+    const shellBackground = await page.locator('.app-shell').evaluate((el) => getComputedStyle(el).backgroundColor)
+    expect(shellBackground).toBe('rgb(244, 246, 245)')
+
+    await page.getByRole('button', { name: 'Дохід', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    const dialogColors = await dialog.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { background: style.backgroundColor, color: style.color }
+    })
+    expect(dialogColors).toEqual({ background: 'rgb(255, 255, 255)', color: 'rgb(23, 32, 29)' })
+  })
+})
