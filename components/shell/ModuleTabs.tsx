@@ -6,14 +6,18 @@ import { useShell } from '@/lib/hooks/useShell'
 import { MODULE_TABS, activeModule } from '@/lib/shell/modules'
 import { cn } from '@/lib/utils'
 
-// Navigation links styled as underlined tabs: Tab moves between them, Enter follows a link.
+// Navigation links styled as large pills (the active module is a dark filled pill, as in Finmap):
+// Tab moves between them, Enter follows a link. Sticky at the top of the scrolling content column.
 export function ModuleTabs() {
   const { orgId } = useShell()
   const pathname = usePathname()
   const active = activeModule(pathname, orgId)
 
   return (
-    <nav aria-label="Модулі" className="sticky top-0 z-10 flex shrink-0 gap-6 overflow-x-auto border-b border-line bg-surface px-4 lg:px-6">
+    <nav
+      aria-label="Модулі"
+      className="sticky top-0 z-10 flex shrink-0 items-center gap-1 overflow-x-auto bg-surface px-4 pt-4 pb-3 lg:px-8"
+    >
       {MODULE_TABS.map((tab) => {
         const isActive = tab.key === active
         return (
@@ -22,8 +26,8 @@ export function ModuleTabs() {
             href={tab.href(orgId)}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              '-mb-px whitespace-nowrap border-b-2 py-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground',
-              isActive ? 'border-brand text-ink' : 'border-transparent text-ink-muted hover:text-ink',
+              'whitespace-nowrap rounded-full px-4 py-1.5 text-lg font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground',
+              isActive ? 'bg-ink text-white' : 'text-ink-muted hover:bg-canvas hover:text-ink',
             )}
           >
             {tab.label}

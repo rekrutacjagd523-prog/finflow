@@ -13,6 +13,11 @@ export function formatDayShortUtc(date: Date): string {
   }).format(date)
 }
 
+/** Short weekday of a transaction date in UTC (`пт`), for the same reason as `formatDayShortUtc`. */
+export function formatWeekdayShortUtc(date: Date): string {
+  return new Intl.DateTimeFormat('uk-UA', { weekday: 'short', timeZone: 'UTC' }).format(date)
+}
+
 /**
  * Net amount of one journal day: income minus expense; transfers move money between own
  * accounts and do not count. Returns null when the day's non-transfer transactions use more than

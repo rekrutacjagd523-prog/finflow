@@ -22,8 +22,10 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
     <Link
       href={`/${orgId}/transactions`}
       className={cn(
-        'inline-flex items-center gap-2 rounded-control text-sm font-medium text-ink-muted transition-colors hover:bg-canvas hover:text-ink',
-        variant === 'panel' ? 'px-3 py-2' : '-ml-1 px-1 py-1',
+        'inline-flex items-center gap-2 rounded-control text-sm font-medium transition-colors',
+        variant === 'panel'
+          ? 'self-start bg-canvas px-3 py-2 text-ink hover:bg-line'
+          : '-ml-1 px-1 py-1 text-ink-muted hover:bg-canvas hover:text-ink',
         FOCUS,
       )}
     >
@@ -60,7 +62,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
   }
 
   return (
-    <div data-testid="settings-menu" className="flex h-full w-64 flex-col overflow-y-auto border-r border-line p-3">
+    <div data-testid="settings-menu" className="flex h-full w-72 flex-col overflow-y-auto border-r border-line p-3">
       {back}
       <p className="mt-4 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Налаштування</p>
       <nav aria-label="Розділи налаштувань" className="flex flex-col gap-0.5">

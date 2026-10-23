@@ -6,7 +6,7 @@ import { buildCashFlow, MonthlyData } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
 import { cn } from '@/lib/utils'
 import CashFlowChart from '@/components/charts/CashFlowChart'
-import { Download, ArrowLeft } from 'lucide-react'
+import { Download } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 
@@ -46,17 +46,10 @@ export default function CashFlowPage() {
   }
 
   return (
-    <div className="px-4 py-5 lg:px-6 lg:py-6">
-      <div className="mx-auto max-w-5xl space-y-6">
+    // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Link
-            href={`/${orgSlug}/analytics`}
-            aria-label="Усі звіти"
-            className="rounded-control p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl font-semibold text-ink">Cash Flow</h1>
             <p className="text-sm text-ink-muted">Рух коштів по місяцях</p>
@@ -172,7 +165,6 @@ export default function CashFlowPage() {
             </div>
           )}
         </div>
-      </div>
     </div>
   )
 }

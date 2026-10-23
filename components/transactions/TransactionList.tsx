@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TransactionForm } from '@/components/forms/TransactionForm'
 import { cn } from '@/lib/utils'
+import { ACCOUNT_TYPE_LABELS } from '@/lib/utils/accounts'
 import { formatCurrency } from '@/lib/utils/currency'
-import { formatDayShortUtc, summarizeDay } from '@/lib/utils/journal'
+import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
 import type { Transaction, Account, Category } from '@/types'
 
 // Sign and colour of an amount; a transfer moves money between own accounts, so it stays neutral.
@@ -66,7 +67,7 @@ export function TransactionList({
     return (
       <div className="space-y-2" aria-busy="true">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-11 animate-pulse rounded-control bg-canvas" />
+          <div key={i} className="h-14 animate-pulse rounded-control bg-canvas" />
         ))}
       </div>
     )
@@ -88,15 +89,16 @@ export function TransactionList({
 
   return (
     <>
-      <div className="overflow-hidden rounded-panel border border-line bg-surface">
+      {/* Flush in the white shell panel: no card of its own around the table. */}
+      <div className="-mx-4 sm:mx-0">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="hidden w-28 pl-4 sm:table-cell">Дата</TableHead>
+              <TableHead className="hidden w-32 pl-4 sm:table-cell sm:pl-2">Дата</TableHead>
               <TableHead className="hidden w-40 text-right sm:table-cell">Сума</TableHead>
-              <TableHead className="pl-4 sm:pl-3">Рахунок</TableHead>
+              <TableHead className="pl-4 sm:pl-6">Рахунок</TableHead>
               <TableHead className="hidden md:table-cell">Категорія</TableHead>
-              <TableHead className="hidden pr-4 md:table-cell">Коментар</TableHead>
+              <TableHead className="hidden pr-2 md:table-cell">Коментар</TableHead>
               <TableHead className="pr-4 text-right sm:hidden">Сума</TableHead>
             </TableRow>
           </TableHeader>
@@ -109,10 +111,10 @@ export function TransactionList({
 
             return (
               <TableBody key={dateKey} className="[&_tr:last-child]:border-b">
-                <TableRow className="bg-canvas hover:bg-canvas">
-                  <TableHead scope="rowgroup" colSpan={COLUMN_COUNT} className="h-auto px-4 py-2 font-semibold">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead scope="rowgroup" colSpan={COLUMN_COUNT} className="h-auto px-4 pt-5 pb-2 sm:px-2">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-ink-muted">{formatGroupKey(dateKey)}</span>
+                      <span className="text-xs font-medium text-ink-muted">{formatGroupKey(dateKey)}</span>
                       {day && (
                         <span className={cn('text-xs font-semibold tabular-nums', dayStyle.className)}>
                           {dayStyle.sign}
@@ -140,18 +142,22 @@ export function TransactionList({
                       }}
                       className="cursor-pointer hover:bg-canvas focus-visible:bg-brand-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-soft-foreground"
                     >
-                      <TableCell className="hidden pl-4 text-ink-muted tabular-nums sm:table-cell">
-                        {formatDayShortUtc(tx.date)}
+                      <TableCell className="hidden py-3.5 pl-4 tabular-nums sm:table-cell sm:pl-2">
+                        <span className="block text-ink">{formatDayShortUtc(tx.date)}</span>
+                        <span className="block text-xs text-ink-muted">{formatWeekdayShortUtc(tx.date)}</span>
                       </TableCell>
-                      <TableCell className={cn('hidden text-right font-semibold tabular-nums sm:table-cell', amount.className)}>
+                      <TableCell className={cn('hidden py-3.5 text-right font-semibold tabular-nums sm:table-cell', amount.className)}>
                         {amountLabel(tx)}
                       </TableCell>
-                      <TableCell className="pl-4 text-ink sm:pl-3">
+                      <TableCell className="py-3.5 pl-4 text-ink sm:pl-6">
                         <span className="block max-w-44 truncate sm:max-w-56">
                           {toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')}
                         </span>
-                        {/* The Category column is hidden below md; keep the name as a second line there. */}
-                        <span className="block max-w-44 truncate text-xs text-ink-subtle md:hidden">{categoryName}</span>
+                        {/* Second line: the category below md (its column is hidden there), the account type above. */}
+                        <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
+                        <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
+                          {account ? ACCOUNT_TYPE_LABELS[account.type] ?? '' : ''}
+                        </span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {category ? (
@@ -165,10 +171,10 @@ export function TransactionList({
                           <span className="text-ink-subtle">Без категорії</span>
                         )}
                       </TableCell>
-                      <TableCell className="hidden pr-4 text-ink-muted md:table-cell">
+                      <TableCell className="hidden pr-2 text-ink-muted md:table-cell">
                         <span className="block max-w-72 truncate">{tx.description || '—'}</span>
                       </TableCell>
-                      <TableCell className={cn('pr-4 text-right font-semibold tabular-nums sm:hidden', amount.className)}>
+                      <TableCell className={cn('py-3.5 pr-4 text-right font-semibold tabular-nums sm:hidden', amount.className)}>
                         {amountLabel(tx)}
                       </TableCell>
                     </TableRow>

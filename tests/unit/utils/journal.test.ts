@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDayShortUtc, summarizeDay } from '@/lib/utils/journal'
+import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
 
 const tx = (type: 'income' | 'expense' | 'transfer', amount: number, currency = 'UAH') => ({ type, amount, currency })
 
@@ -18,6 +18,14 @@ describe('formatDayShortUtc', () => {
     const date = new Date('2026-01-05T01:00:00Z')
     expect(date.toISOString().split('T')[0]).toBe('2026-01-05')
     expect(formatDayShortUtc(date)).toBe('5 січ.')
+  })
+})
+
+describe('formatWeekdayShortUtc', () => {
+  it('reads the UTC weekday at both ends of the UTC day', () => {
+    // 2026-10-23 is a Friday.
+    expect(formatWeekdayShortUtc(new Date('2026-10-23T00:00:00Z'))).toBe('пт')
+    expect(formatWeekdayShortUtc(new Date('2026-10-23T23:59:59Z'))).toBe('пт')
   })
 })
 

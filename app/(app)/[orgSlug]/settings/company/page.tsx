@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { useShell } from '@/lib/hooks/useShell'
@@ -81,16 +82,17 @@ export default function CompanySettingsPage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="currency" className="text-ink">Валюта</Label>
-            <select
+            <NativeSelect
               id="currency"
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="h-9 w-full rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-soft-foreground"
+              wrapperClassName="flex w-full"
+              className="border-line"
             >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <Button type="submit" size="lg" disabled={!isChanged || saving}>
             {saving ? 'Збереження...' : 'Зберегти'}

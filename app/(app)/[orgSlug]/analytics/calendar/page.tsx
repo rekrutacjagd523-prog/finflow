@@ -2,11 +2,9 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import CalendarView from '@/components/charts/CalendarView'
-import { ArrowLeft } from 'lucide-react'
 
 export default function CalendarPage() {
   const params = useParams()
@@ -32,33 +30,22 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="px-4 py-5 lg:px-6 lg:py-6">
-      <div className="mx-auto max-w-3xl space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/${orgSlug}/analytics`}
-            aria-label="Усі звіти"
-            className="rounded-control p-2 text-ink-muted transition-colors hover:bg-canvas hover:text-ink"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div>
-            <h1 className="font-display text-xl font-semibold text-ink">Календар</h1>
-            <p className="text-sm text-ink-muted">Щоденний рух грошей</p>
-          </div>
-        </div>
-
-        {/* Calendar */}
-        <CalendarView
-          transactions={transactions}
-          year={year}
-          month={month}
-          onNavigate={handleNavigate}
-          currency={org?.currency ?? 'UAH'}
-          loading={loading}
-        />
+    // The shared container and the reports' sub-navigation come from analytics/layout.tsx; the
+    // day list keeps a narrower, readable width inside it.
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <h1 className="font-display text-xl font-semibold text-ink">Календар</h1>
+        <p className="text-sm text-ink-muted">Щоденний рух грошей</p>
       </div>
+
+      <CalendarView
+        transactions={transactions}
+        year={year}
+        month={month}
+        onNavigate={handleNavigate}
+        currency={org?.currency ?? 'UAH'}
+        loading={loading}
+      />
     </div>
   )
 }

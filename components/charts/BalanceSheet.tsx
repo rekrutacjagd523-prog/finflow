@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Account } from '@/types'
 import { currencySymbol, formatCurrency } from '@/lib/utils/currency'
+import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface BalanceSheetProps {
   accounts: Account[]
@@ -49,7 +50,7 @@ function EditableRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-sm text-[#374151] flex-1">{label}</span>
+      <span className="text-sm text-ink flex-1">{label}</span>
       <div className="flex items-center gap-1 shrink-0">
         <input
           type="number"
@@ -58,10 +59,10 @@ function EditableRow({
           value={value || ''}
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
           placeholder="0.00"
-          className="w-32 text-right text-sm px-2 py-1 rounded-md border border-[#e5e7eb] focus:outline-none focus:ring-1 focus:ring-[#00c896] focus:border-[#00c896] text-[#111111] bg-white"
+          className="w-32 text-right text-sm px-2 py-1 rounded-md border border-line focus:outline-none focus:ring-1 focus:ring-brand-soft-foreground focus:border-brand-soft-foreground text-ink bg-surface"
           style={{ fontVariantNumeric: 'tabular-nums' }}
         />
-        <span className="text-xs text-[#6b7280]">{currencySymbol(currency)}</span>
+        <span className="text-xs text-ink-muted">{currencySymbol(currency)}</span>
       </div>
     </div>
   )
@@ -70,10 +71,10 @@ function EditableRow({
 function ReadOnlyRow({ label, value, currency, color }: { label: string; value: number; currency: string; color?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-sm text-[#374151] flex-1">{label}</span>
+      <span className="text-sm text-ink flex-1">{label}</span>
       <span
         className="text-sm font-medium shrink-0"
-        style={{ fontVariantNumeric: 'tabular-nums', color: color ?? (value >= 0 ? '#111111' : '#ef4444') }}
+        style={{ fontVariantNumeric: 'tabular-nums', color: color ?? (value >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense) }}
       >
         {formatCurrency(value, currency)}
       </span>
@@ -83,13 +84,13 @@ function ReadOnlyRow({ label, value, currency, color }: { label: string; value: 
 
 function SectionHeader({ roman, title, total, currency }: { roman: string; title: string; total: number; currency: string }) {
   return (
-    <div className="flex items-center justify-between py-2 border-t border-[#e5e7eb] mt-2">
-      <span className="text-xs font-bold text-[#6b7280] uppercase tracking-wide">
+    <div className="flex items-center justify-between py-2 border-t border-line mt-2">
+      <span className="text-xs font-bold text-ink-muted uppercase tracking-wide">
         {roman}. {title}
       </span>
       <span
         className="text-sm font-semibold"
-        style={{ fontVariantNumeric: 'tabular-nums', color: total >= 0 ? '#111111' : '#ef4444' }}
+        style={{ fontVariantNumeric: 'tabular-nums', color: total >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense }}
       >
         {formatCurrency(total, currency)}
       </span>
@@ -101,12 +102,12 @@ function Skeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {[0, 1].map((i) => (
-        <div key={i} className="rounded-xl border border-[#e5e7eb] p-5 space-y-4">
-          <div className="h-4 w-28 bg-[#e5e7eb] rounded animate-pulse" />
+        <div key={i} className="rounded-xl border border-line p-5 space-y-4">
+          <div className="h-4 w-28 bg-line rounded animate-pulse" />
           {Array.from({ length: 4 }).map((_, j) => (
             <div key={j} className="flex justify-between items-center gap-4">
-              <div className="h-3 flex-1 bg-[#f9fafb] rounded animate-pulse" />
-              <div className="h-3 w-24 bg-[#f9fafb] rounded animate-pulse" />
+              <div className="h-3 flex-1 bg-canvas rounded animate-pulse" />
+              <div className="h-3 w-24 bg-canvas rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -174,10 +175,10 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
       {/* ======= ASSETS ======= */}
-      <div className="rounded-xl border border-[#e5e7eb] bg-white p-5 space-y-1">
-        <div className="flex items-center justify-between pb-3 border-b border-[#e5e7eb]">
-          <h3 className="text-sm font-bold text-[#111111] uppercase tracking-wide">Активи</h3>
-          <span className="text-sm font-bold text-[#00c896]">{formatCurrency(totalAssets, currency)}</span>
+      <div className="rounded-xl border border-line bg-surface p-5 space-y-1">
+        <div className="flex items-center justify-between pb-3 border-b border-line">
+          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">Активи</h3>
+          <span className="text-sm font-bold text-brand-soft-foreground">{formatCurrency(totalAssets, currency)}</span>
         </div>
 
         {/* I. Fixed */}
@@ -189,10 +190,10 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
           <div key={acc.id} className="flex items-center justify-between gap-3 pl-4 py-1">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: acc.color }} />
-              <span className="text-xs text-[#6b7280] truncate">{acc.name}</span>
+              <span className="text-xs text-ink-muted truncate">{acc.name}</span>
             </div>
             {/* A single account is shown in its own currency. */}
-            <span className="text-xs text-[#6b7280] shrink-0">{formatCurrency(acc.balance, acc.currency)}</span>
+            <span className="text-xs text-ink-muted shrink-0">{formatCurrency(acc.balance, acc.currency)}</span>
           </div>
         ))}
 
@@ -204,17 +205,17 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
         {/* III. Money */}
         <SectionHeader roman="III" title="Гроші" total={moneyTotal} currency={currency} />
         {accounts.length === 0 ? (
-          <p className="text-sm text-[#6b7280] italic py-1">Немає рахунків</p>
+          <p className="text-sm text-ink-muted italic py-1">Немає рахунків</p>
         ) : (
           accounts.map((acc) => (
             <div key={acc.id} className="flex items-center justify-between gap-3 py-1">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: acc.color }} />
-                <span className="text-sm text-[#374151] truncate">{acc.name}</span>
+                <span className="text-sm text-ink truncate">{acc.name}</span>
               </div>
               <span
                 className="text-sm font-medium shrink-0"
-                style={{ color: acc.balance >= 0 ? '#111111' : '#ef4444' }}
+                style={{ color: acc.balance >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense }}
               >
                 {formatCurrency(acc.balance, acc.currency)}
               </span>
@@ -223,41 +224,41 @@ export default function BalanceSheet({ accounts, orgId = 'default', currency, lo
         )}
 
         {/* Total */}
-        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-[#111111]">
-          <span className="text-base font-bold text-[#111111]">Всього активи</span>
-          <span className="text-base font-bold text-[#00c896]">{formatCurrency(totalAssets, currency)}</span>
+        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-ink">
+          <span className="text-base font-bold text-ink">Всього активи</span>
+          <span className="text-base font-bold text-brand-soft-foreground">{formatCurrency(totalAssets, currency)}</span>
         </div>
       </div>
 
       {/* ======= LIABILITIES ======= */}
-      <div className="rounded-xl border border-[#e5e7eb] bg-white p-5 space-y-1">
-        <div className="flex items-center justify-between pb-3 border-b border-[#e5e7eb]">
-          <h3 className="text-sm font-bold text-[#111111] uppercase tracking-wide">Зобов’язання</h3>
-          <span className="text-sm font-bold text-[#6366f1]">{formatCurrency(totalLiabilities, currency)}</span>
+      <div className="rounded-xl border border-line bg-surface p-5 space-y-1">
+        <div className="flex items-center justify-between pb-3 border-b border-line">
+          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">Зобов’язання</h3>
+          <span className="text-sm font-bold text-ink">{formatCurrency(totalLiabilities, currency)}</span>
         </div>
 
         {/* I. Equity */}
         <SectionHeader roman="I" title="Власний капітал" total={equityTotal} currency={currency} />
         <EditableRow label="Статутний капітал" value={fields.charter_capital} currency={currency} onChange={(v) => updateField('charter_capital', v)} />
         <EditableRow label="Додатковий капітал" value={fields.additional_capital} currency={currency} onChange={(v) => updateField('additional_capital', v)} />
-        <ReadOnlyRow label="Нерозподілений прибуток" value={retainedEarnings} currency={currency} color={retainedEarnings >= 0 ? '#22c55e' : '#ef4444'} />
+        <ReadOnlyRow label="Нерозподілений прибуток" value={retainedEarnings} currency={currency} color={retainedEarnings >= 0 ? TOKEN_COLORS.income : TOKEN_COLORS.expense} />
 
         {/* II. Debt */}
         <SectionHeader roman="II" title="Позиковий капітал" total={debtTotal} currency={currency} />
         <EditableRow label="Кредити" value={fields.loans} currency={currency} onChange={(v) => updateField('loans', v)} />
 
         {/* Total */}
-        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-[#111111]">
-          <span className="text-base font-bold text-[#111111]">Всього зобов’язання</span>
-          <span className="text-base font-bold text-[#6366f1]">{formatCurrency(totalLiabilities, currency)}</span>
+        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-ink">
+          <span className="text-base font-bold text-ink">Всього зобов’язання</span>
+          <span className="text-base font-bold text-ink">{formatCurrency(totalLiabilities, currency)}</span>
         </div>
 
         {/* Balance check */}
         <div className={[
           'flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium mt-2',
           Math.abs(totalAssets - totalLiabilities) < 0.01
-            ? 'bg-[#f0fdf4] text-[#22c55e]'
-            : 'bg-[#fef2f2] text-[#ef4444]',
+            ? 'bg-brand-soft text-income'
+            : 'bg-expense-soft text-expense',
         ].join(' ')}>
           <span>Баланс</span>
           <span>

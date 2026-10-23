@@ -17,7 +17,7 @@ import { isJournalPath } from '@/lib/shell/modules'
 import { settingsPath } from '@/lib/shell/settings-sections'
 import { cn } from '@/lib/utils'
 import { summarizeAccounts } from '@/lib/utils/accounts'
-import { formatCurrency } from '@/lib/utils/currency'
+import { formatCurrency, splitCurrency } from '@/lib/utils/currency'
 import type { Account } from '@/types'
 
 interface AccountsSidebarProps {
@@ -126,31 +126,42 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
     )
   }
 
+  const total = summary ? splitCurrency(summary.total, summary.currency) : null
+
   return (
     <div
       data-testid="accounts-sidebar"
       data-collapsed="false"
-      className={cn('flex h-full flex-col', variant === 'panel' ? 'w-64 border-r border-line' : 'w-full')}
+      className={cn('flex h-full flex-col', variant === 'panel' ? 'w-72 border-r border-line' : 'w-full')}
     >
-      <div className="flex items-start justify-between gap-2 px-4 pt-4 pb-3">
+      <div className="flex items-start justify-between gap-2 px-5 pt-5 pb-4">
         <div data-testid="accounts-summary" className="min-w-0">
-          {summary ? (
+          {summary && total ? (
             <>
               <p className="text-xs text-ink-muted">Разом у {summary.currency}</p>
               <p
                 data-testid="accounts-total"
                 className={cn(
-                  'mt-0.5 truncate font-display text-xl font-semibold tabular-nums',
+                  'mt-1 truncate text-2xl font-bold tracking-tight tabular-nums',
                   summary.total < 0 ? 'text-expense' : 'text-ink',
                 )}
               >
-                {formatCurrency(summary.total, summary.currency)}
+                {/* The full amount as one text node for assistive tech (and text queries); the
+                    visual copy shows the decimals and the currency smaller and muted. */}
+                <span className="sr-only">{formatCurrency(summary.total, summary.currency)}</span>
+                <span aria-hidden>
+                  {total.whole}
+                  <span className="text-base font-semibold text-ink-muted">
+                    {total.fraction}
+                    {total.rest}
+                  </span>
+                </span>
               </p>
             </>
           ) : (
             <div className="space-y-1.5">
               <div className="h-3 w-20 animate-pulse rounded bg-line" />
-              <div className="h-6 w-32 animate-pulse rounded bg-line" />
+              <div className="h-7 w-36 animate-pulse rounded bg-line" />
             </div>
           )}
         </div>
@@ -161,7 +172,20 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="flex-1 overflow-y-auto border-t border-line px-2 pt-3 pb-4">
+        <div className="flex items-center justify-between gap-2 pr-1 pb-1 pl-3">
+          <h2 className="text-sm font-semibold text-ink">Мої рахунки</h2>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleAdd}
+            aria-label="Додати рахунок"
+            className="text-brand-soft-foreground hover:bg-brand-soft hover:text-brand-soft-foreground"
+          >
+            <Plus />
+          </Button>
+        </div>
+
         <button type="button" onClick={() => choose(null)} aria-pressed={selectedAccountId === null} className={rowClass(selectedAccountId === null)}>
           <span className="size-2.5 shrink-0 rounded-full bg-brand" />
           <span className="min-w-0 flex-1 truncate">Усі рахунки</span>
@@ -181,7 +205,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
             {accounts.map((account) => {
               const selected = selectedAccountId === account.id
               return (
-                <li key={account.id} className="flex items-center gap-1">
+                <li key={account.id} className="group/row flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => choose(selected ? null : account.id)}
@@ -195,9 +219,11 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
                     </span>
                   </button>
                   <DropdownMenu>
+                    {/* Shown on hover or keyboard focus of the row (and while its menu is open);
+                        always shown on touch screens, which have no hover. */}
                     <DropdownMenuTrigger
                       aria-label={`Дії з рахунком ${account.name}`}
-                      className="flex size-7 shrink-0 items-center justify-center rounded-control text-ink-subtle transition-colors hover:bg-canvas hover:text-ink focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
+                      className="flex size-7 shrink-0 items-center justify-center rounded-control text-ink-muted opacity-0 transition-[opacity,color,background-color] group-hover/row:opacity-100 group-focus-within/row:opacity-100 hover:bg-canvas hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-brand-soft-foreground data-popup-open:opacity-100 [@media(hover:none)]:opacity-100"
                     >
                       <MoreHorizontal className="size-4" />
                     </DropdownMenuTrigger>
@@ -217,17 +243,12 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
             })}
           </ul>
         )}
-      </div>
 
-      <div className="space-y-2 border-t border-line p-3">
-        <Button variant="soft" size="lg" className="w-full justify-start" onClick={handleAdd}>
-          <Plus />
-          Додати рахунок
-        </Button>
+        {/* Right under the list (as in Finmap), not pinned to the bottom of the column. */}
         <Link
           href={settingsPath(orgId, 'banks')}
           onClick={onNavigate}
-          className="flex items-center gap-3 rounded-field border border-dashed border-line px-3 py-2.5 transition-colors hover:border-brand hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
+          className="mx-1 mt-3 flex items-center gap-3 rounded-field border border-dashed border-line px-3 py-2.5 transition-colors hover:border-brand hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
         >
           <Building2 className="size-4 shrink-0 text-brand-soft-foreground" />
           <span className="min-w-0">

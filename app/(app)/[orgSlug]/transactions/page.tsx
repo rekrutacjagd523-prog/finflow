@@ -6,6 +6,8 @@ import { TransactionFiltersBar } from '@/components/transactions/TransactionFilt
 import { TransactionList } from '@/components/transactions/TransactionList'
 import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
+import { PAGE_CONTAINER } from '@/lib/ui/layout'
+import { cn } from '@/lib/utils'
 import type { TransactionFilters } from '@/lib/firebase/transactions'
 
 export default function TransactionsPage() {
@@ -22,26 +24,27 @@ export default function TransactionsPage() {
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-5 lg:px-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-lg font-semibold text-ink">Платежі</h1>
-        {selectedAccount && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft py-1 pr-1 pl-2.5 text-xs font-medium text-brand-soft-foreground">
-            <span className="size-2 rounded-full" style={{ backgroundColor: selectedAccount.color }} />
-            {selectedAccount.name}
-            <button
-              type="button"
-              onClick={() => selectAccount(null)}
-              aria-label="Показати всі рахунки"
-              className="flex size-5 items-center justify-center rounded-full hover:bg-surface focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
-            >
-              <X className="size-3" />
-            </button>
-          </span>
-        )}
-      </div>
+    <div className={cn(PAGE_CONTAINER, 'space-y-4 pt-2 lg:pt-2')}>
+      {/* The active tab already names the page; the heading stays for screen readers. */}
+      <h1 className="sr-only">Платежі</h1>
 
       <TransactionFiltersBar
+        accessory={
+          selectedAccount && (
+            <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-brand-soft pr-1.5 pl-3 text-sm font-medium text-brand-soft-foreground">
+              <span className="size-2 rounded-full" style={{ backgroundColor: selectedAccount.color }} />
+              <span className="max-w-40 truncate">{selectedAccount.name}</span>
+              <button
+                type="button"
+                onClick={() => selectAccount(null)}
+                aria-label="Показати всі рахунки"
+                className="flex size-6 items-center justify-center rounded-full hover:bg-surface focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            </span>
+          )
+        }
         accounts={accounts}
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}

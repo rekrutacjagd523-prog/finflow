@@ -36,8 +36,9 @@ export default async function AnalyticsPage({ params }: Props) {
   const { orgSlug } = await params
 
   return (
-    <div className="px-4 py-5 lg:px-6 lg:py-8">
-      <div className="mx-auto max-w-4xl space-y-8">
+    // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
+    <div>
+      <div className="max-w-4xl space-y-8">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Аналітика</h1>
           <p className="mt-1 text-ink-muted">Оберіть розділ для перегляду звітів</p>

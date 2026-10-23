@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useShell } from '@/lib/hooks/useShell'
 import { createCategory } from '@/lib/firebase/categories'
@@ -103,15 +104,15 @@ export default function CategoriesSettingsPage() {
                 aria-label="Назва категорії"
                 className="h-9 flex-1 rounded-control border-line bg-surface"
               />
-              <select
+              <NativeSelect
                 value={newCatType}
                 onChange={(e) => setNewCatType(e.target.value as 'income' | 'expense')}
                 aria-label="Тип категорії"
-                className="h-9 rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand-soft-foreground"
+                className="border-line"
               >
                 <option value="income">Дохід</option>
                 <option value="expense">Витрата</option>
-              </select>
+              </NativeSelect>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {CATEGORY_COLORS.map((c) => (
