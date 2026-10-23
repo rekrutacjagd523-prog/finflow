@@ -123,6 +123,8 @@
 }
 
 .dark {
+  /* Set here, not inline by next-themes, so that :root:has(.app-shell) can override it (S01A). */
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -189,6 +191,8 @@
 }
 
 :root:has(.app-shell) {
+  /* Also what the portalled layers inherit. It beats `.dark { color-scheme: dark }` by specificity;
+     next-themes must not write color-scheme inline (enableColorScheme={false} in app/layout.tsx). */
   color-scheme: light;
   --background: #ffffff;
   --foreground: #17201d;
