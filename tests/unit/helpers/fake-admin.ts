@@ -3,14 +3,20 @@ import { vi } from 'vitest'
 /**
  * In-memory stand-in for getAdmin() from '@/lib/server/firebase-admin'.
  * Route tests mock that module with `{ getAdmin: () => fakeAdmin }`, so the REAL
- * requireUserFromBearer / requireOrgMember from '@/lib/server/auth' run against this data.
+ * requireUser / requireVerifiedUser / requireOrgMember from '@/lib/server/auth' run against this data.
  * Only `organizations/{orgId}` documents are modelled; both db.doc(path) and
  * db.collection(name).doc(id) access styles are supported.
  */
 export const fakeOrgs = new Map<string, Record<string, unknown>>()
 
-/** Firebase ID token -> uid accepted by the fake verifyIdToken. */
+/** Accepted credential -> uid. Used for BOTH session-cookie values and ID tokens. */
 export const fakeTokens = new Map<string, string>()
+
+/** uids whose email is NOT verified (everyone else is verified). */
+export const fakeUnverified = new Set<string>()
+
+/** ID token -> seconds since its sign-in (default 0 = just signed in). */
+export const fakeIdTokenAgeSec = new Map<string, number>()
 
 export const TEST_EB_STATE_SECRET = 'route-test-secret-0123456789abcdef'
 export const TEST_APP_URL = 'https://finflow.test'
@@ -35,6 +41,12 @@ function docRef(path: string) {
   }
 }
 
+function invalid(what: string): Error {
+  // Like the real Admin SDK: a rejected credential carries an `auth/...` code, which
+  // toAuthHttpError maps to 401 (errors without such a code become 503).
+  return Object.assign(new Error(`invalid ${what}`), { code: 'auth/argument-error' })
+}
+
 export const fakeAdmin = {
   db: {
     doc: (path: string) => docRef(path),
@@ -43,20 +55,44 @@ export const fakeAdmin = {
   auth: {
     verifyIdToken: vi.fn(async (token: string) => {
       const uid = fakeTokens.get(token)
-      // Like the real Admin SDK: a rejected token carries an `auth/...` code, which
-      // requireUserFromBearer maps to 401 (errors without such a code become 503).
-      if (!uid) throw Object.assign(new Error('invalid id token'), { code: 'auth/invalid-id-token' })
-      return { uid }
+      if (!uid) throw invalid('id token')
+      return {
+        uid,
+        auth_time: Math.floor(Date.now() / 1000) - (fakeIdTokenAgeSec.get(token) ?? 0),
+      }
     }),
+    verifySessionCookie: vi.fn(async (cookie: string) => {
+      const uid = fakeTokens.get(cookie)
+      if (!uid) throw invalid('session cookie')
+      return { uid, email_verified: !fakeUnverified.has(uid) }
+    }),
+    getUser: vi.fn(async (uid: string) => {
+      if (![...fakeTokens.values()].includes(uid)) {
+        throw Object.assign(new Error('no user'), { code: 'auth/user-not-found' })
+      }
+      return { uid, emailVerified: !fakeUnverified.has(uid) }
+    }),
+    createSessionCookie: vi.fn(async (_idToken: string, _options: { expiresIn: number }) => 'minted-session-cookie'),
+    revokeRefreshTokens: vi.fn(async (_uid: string) => {}),
   },
 }
 
-/** Resets the fixture: alice owns org-acme; mallory is signed in but not a member of anything. */
+/**
+ * Resets the fixture:
+ *  - alice owns org-acme and has a verified email;
+ *  - mallory is signed in with a verified email but is not a member of anything;
+ *  - bob is signed in but his email is NOT verified.
+ * Each user has a credential named token-<name> (works as an ID token and as a session cookie).
+ */
 export function resetFakeAdmin(): void {
   fakeOrgs.clear()
   fakeTokens.clear()
+  fakeUnverified.clear()
+  fakeIdTokenAgeSec.clear()
   fakeTokens.set('token-alice', 'user-alice')
   fakeTokens.set('token-mallory', 'user-mallory')
+  fakeTokens.set('token-bob', 'user-bob')
+  fakeUnverified.add('user-bob')
   fakeOrgs.set('org-acme', {
     name: 'Acme',
     currency: 'PLN',
@@ -64,7 +100,7 @@ export function resetFakeAdmin(): void {
     plan: 'trial',
     members: { 'user-alice': { role: 'owner' } },
   })
-  fakeAdmin.auth.verifyIdToken.mockClear()
+  for (const fn of Object.values(fakeAdmin.auth)) fn.mockClear()
 }
 
 /** A JSON Response, as returned by the mocked global fetch for Enable Banking calls. */
