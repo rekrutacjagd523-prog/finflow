@@ -1,12 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HttpError } from '@/lib/server/http-error'
-import { isOrgMember, requireOrgMember, requireUserFromBearer } from '@/lib/server/auth'
+import {
+  isOrgMember,
+  isSessionCookieValid,
+  requireOrgMember,
+  requireUser,
+  requireUserFromBearer,
+  requireVerifiedUser,
+} from '@/lib/server/auth'
 
 // lib/server/auth.ts talks to Firebase only through getAdmin(); replace it with
-// a fake { auth: { verifyIdToken }, db: { doc(path).get() } }.
+// a fake { auth: { verifyIdToken, verifySessionCookie, getUser }, db: { doc(path).get() } }.
 const admin = vi.hoisted(() => ({
   getAdmin: vi.fn(),
   verifyIdToken: vi.fn(),
+  verifySessionCookie: vi.fn(),
+  getUser: vi.fn(),
   doc: vi.fn(),
   get: vi.fn(),
 }))
@@ -15,10 +24,16 @@ vi.mock('@/lib/server/firebase-admin', () => ({ getAdmin: admin.getAdmin }))
 
 beforeEach(() => {
   admin.verifyIdToken.mockReset()
+  admin.verifySessionCookie.mockReset()
+  admin.getUser.mockReset()
   admin.get.mockReset()
   admin.doc.mockReset().mockReturnValue({ get: admin.get })
   admin.getAdmin.mockReset().mockReturnValue({
-    auth: { verifyIdToken: admin.verifyIdToken },
+    auth: {
+      verifyIdToken: admin.verifyIdToken,
+      verifySessionCookie: admin.verifySessionCookie,
+      getUser: admin.getUser,
+    },
     db: { doc: admin.doc },
   })
 })
@@ -59,6 +74,208 @@ describe('isOrgMember', () => {
     const members = Object.create({ u1: { role: 'owner' } }) as object
     expect(isOrgMember({ members }, 'u1')).toBe(false)
     expect(isOrgMember({ members: {} }, 'toString')).toBe(false)
+  })
+})
+
+function requestWithCookie(
+  cookie?: string,
+  init: { method?: string; origin?: string } = {},
+): Request {
+  const headers = new Headers()
+  if (cookie !== undefined) headers.set('cookie', cookie)
+  if (init.origin !== undefined) headers.set('origin', init.origin)
+  return new Request('http://localhost/api/test', { method: init.method ?? 'GET', headers })
+}
+
+function rejection(code: string, message = 'x'): Error {
+  return Object.assign(new Error(message), { code })
+}
+
+describe('requireUser', () => {
+  it('returns uid and emailVerified for a valid, unrevoked session cookie', async () => {
+    admin.verifySessionCookie.mockResolvedValue({ uid: 'u1', email_verified: true })
+
+    await expect(requireUser(requestWithCookie('__session=good'))).resolves.toEqual({
+      uid: 'u1',
+      emailVerified: true,
+    })
+    expect(admin.verifySessionCookie).toHaveBeenCalledWith('good', true)
+  })
+
+  it('reports emailVerified=false when the claim is absent or false', async () => {
+    admin.verifySessionCookie.mockResolvedValueOnce({ uid: 'u1' })
+    await expect(requireUser(requestWithCookie('__session=a'))).resolves.toMatchObject({
+      emailVerified: false,
+    })
+    admin.verifySessionCookie.mockResolvedValueOnce({ uid: 'u1', email_verified: false })
+    await expect(requireUser(requestWithCookie('__session=b'))).resolves.toMatchObject({
+      emailVerified: false,
+    })
+  })
+
+  it.each([
+    ['no Cookie header', undefined],
+    ['other cookies only', 'theme=dark'],
+    ['an empty __session', '__session='],
+  ])('rejects %s with 401 without calling Firebase', async (_label, cookie) => {
+    const err = await requireUser(requestWithCookie(cookie)).catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
+    expect(admin.verifySessionCookie).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    'auth/session-cookie-expired',
+    'auth/session-cookie-revoked',
+    'auth/argument-error',
+    'auth/invalid-id-token',
+    'auth/user-disabled',
+    'auth/user-not-found',
+  ])('maps cookie-validity error %s to 401', async (code) => {
+    admin.verifySessionCookie.mockRejectedValue(rejection(code))
+
+    const err = await requireUser(requestWithCookie('__session=t')).catch((e: unknown) => e)
+
+    expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
+  })
+
+  it.each([
+    ['an auth/internal-error', rejection('auth/internal-error', 'boom SECRET-BODY'), 'auth/internal-error'],
+    ['a network error', rejection('ENOTFOUND', 'getaddrinfo ENOTFOUND SECRET-BODY'), 'ENOTFOUND'],
+    ['an error without a code', new TypeError('fetch failed SECRET-BODY'), 'TypeError'],
+  ])('maps %s to 503, logging only the code or name', async (_label, failure, logged) => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    admin.verifySessionCookie.mockRejectedValue(failure)
+
+    const err = await requireUser(requestWithCookie('__session=secret-cookie')).catch(
+      (e: unknown) => e,
+    )
+
+    expect(err).toMatchObject({ status: 503, message: 'auth unavailable' })
+    expect(log).toHaveBeenCalledWith('verifySessionCookie failed', logged)
+    const dump = JSON.stringify(log.mock.calls)
+    expect(dump).not.toContain('SECRET-BODY')
+    expect(dump).not.toContain('secret-cookie')
+    log.mockRestore()
+  })
+
+  it('does not mask a server configuration error as 401', async () => {
+    admin.getAdmin.mockImplementation(() => {
+      throw new HttpError(500, 'server not configured')
+    })
+
+    const err = await requireUser(requestWithCookie('__session=good')).catch((e: unknown) => e)
+
+    expect(err).toMatchObject({ status: 500, message: 'server not configured' })
+  })
+
+  describe('same-origin check for unsafe methods', () => {
+    beforeEach(() => {
+      admin.verifySessionCookie.mockResolvedValue({ uid: 'u1', email_verified: true })
+    })
+
+    it('accepts POST with a matching Origin', async () => {
+      await expect(
+        requireUser(requestWithCookie('__session=g', { method: 'POST', origin: 'http://localhost' })),
+      ).resolves.toMatchObject({ uid: 'u1' })
+    })
+
+    it.each([
+      ['a foreign Origin', 'https://evil.example'],
+      ['no Origin', undefined],
+    ])('rejects POST with %s using 403 (after the session was verified)', async (_label, origin) => {
+      const err = await requireUser(
+        requestWithCookie('__session=g', { method: 'POST', origin }),
+      ).catch((e: unknown) => e)
+
+      expect(err).toMatchObject({ status: 403, message: 'forbidden' })
+    })
+
+    it('does not check Origin for GET', async () => {
+      await expect(
+        requireUser(requestWithCookie('__session=g', { origin: 'https://evil.example' })),
+      ).resolves.toMatchObject({ uid: 'u1' })
+    })
+
+    it('answers an unauthenticated POST with 401, not 403', async () => {
+      const err = await requireUser(requestWithCookie(undefined, { method: 'POST' })).catch(
+        (e: unknown) => e,
+      )
+      expect(err).toMatchObject({ status: 401 })
+    })
+  })
+})
+
+describe('requireVerifiedUser', () => {
+  beforeEach(() => {
+    admin.verifySessionCookie.mockResolvedValue({ uid: 'u1', email_verified: false })
+  })
+
+  it('resolves when the live user record says the email is verified (even if the cookie claim is stale)', async () => {
+    admin.getUser.mockResolvedValue({ uid: 'u1', emailVerified: true })
+
+    await expect(requireVerifiedUser(requestWithCookie('__session=g'))).resolves.toEqual({
+      uid: 'u1',
+      emailVerified: true,
+    })
+    expect(admin.getUser).toHaveBeenCalledWith('u1')
+  })
+
+  it('rejects with 403 email_not_verified when the email is not verified', async () => {
+    admin.getUser.mockResolvedValue({ uid: 'u1', emailVerified: false })
+
+    const err = await requireVerifiedUser(requestWithCookie('__session=g')).catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(HttpError)
+    expect(err).toMatchObject({ status: 403, message: 'email_not_verified' })
+  })
+
+  it('answers 401 without a session and never reads the user record', async () => {
+    const err = await requireVerifiedUser(requestWithCookie()).catch((e: unknown) => e)
+
+    expect(err).toMatchObject({ status: 401 })
+    expect(admin.getUser).not.toHaveBeenCalled()
+  })
+
+  it('maps a deleted user to 401 and an outage to 503', async () => {
+    admin.getUser.mockRejectedValueOnce(rejection('auth/user-not-found'))
+    await expect(requireVerifiedUser(requestWithCookie('__session=g'))).rejects.toMatchObject({
+      status: 401,
+    })
+
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    admin.getUser.mockRejectedValueOnce(rejection('auth/internal-error'))
+    await expect(requireVerifiedUser(requestWithCookie('__session=g'))).rejects.toMatchObject({
+      status: 503,
+    })
+    expect(log).toHaveBeenCalledWith('getUser failed', 'auth/internal-error')
+    log.mockRestore()
+  })
+})
+
+describe('isSessionCookieValid', () => {
+  it('is true for a valid cookie and skips the revocation round-trip', async () => {
+    admin.verifySessionCookie.mockResolvedValue({ uid: 'u1' })
+
+    await expect(isSessionCookieValid('good')).resolves.toBe(true)
+    expect(admin.verifySessionCookie).toHaveBeenCalledWith('good', false)
+  })
+
+  it.each(['auth/session-cookie-expired', 'auth/argument-error', 'auth/invalid-id-token'])(
+    'is false for %s',
+    async (code) => {
+      admin.verifySessionCookie.mockRejectedValue(rejection(code))
+      await expect(isSessionCookieValid('bad')).resolves.toBe(false)
+    },
+  )
+
+  it('throws a 503 HttpError on an outage so callers can fail closed without logging users out', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    admin.verifySessionCookie.mockRejectedValue(rejection('auth/internal-error'))
+
+    await expect(isSessionCookieValid('x')).rejects.toMatchObject({ status: 503 })
+    log.mockRestore()
   })
 })
 
