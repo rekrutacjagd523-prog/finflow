@@ -1,32 +1,48 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { isAppPath, safeRedirectPath } from '@/lib/auth/paths'
+import { isSessionCookieValid } from '@/lib/server/auth'
+import { SESSION_COOKIE_NAME, isSecureCookieEnv } from '@/lib/server/session-cookie'
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password']
-const AUTH_PATHS = ['/login', '/register']
+function withClearedSession(res: NextResponse): NextResponse {
+  res.cookies.set({
+    name: SESSION_COOKIE_NAME,
+    value: '',
+    path: '/',
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isSecureCookieEnv(),
+  })
+  return res
+}
 
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+// Page-navigation gate (Next 16 `proxy`, Node runtime). It gates ONLY app pages. It verifies the
+// signature and expiry of the `__session` cookie but NOT revocation (that would be a network
+// round-trip per navigation); every API route re-checks with revocation. Firestore data is
+// protected by security rules, not by this file.
+// Auth pages (/login, /register) and every other path pass through untouched: a visitor with a
+// valid cookie but no Firebase SDK user (offline sign-out, revoked elsewhere, wiped storage) must
+// still be able to reach the login page, and signing in again simply overwrites the cookie.
+export async function proxy(request: NextRequest) {
+  const { pathname, search } = request.nextUrl
+  if (!isAppPath(pathname)) return NextResponse.next()
 
-  // Get Firebase auth token from cookie (set by client-side auth)
-  const token = request.cookies.get('__session')?.value
-
-  const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p))
-  const isAuthPath = AUTH_PATHS.some((p) => pathname.startsWith(p))
-  const isAppPath = pathname.match(/^\/[a-zA-Z0-9_-]+\//)
-
-  // Redirect authenticated users away from auth pages
-  if (isAuthPath && token) {
-    return NextResponse.redirect(new URL('/', request.url))
+  const cookie = request.cookies.get(SESSION_COOKIE_NAME)?.value
+  if (cookie) {
+    try {
+      if (await isSessionCookieValid(cookie)) return NextResponse.next()
+    } catch {
+      // Our auth backend failed: do not log everybody out, and do not let anyone in either.
+      return new NextResponse('Authentication service unavailable', { status: 503 })
+    }
   }
 
-  // Redirect unauthenticated users from protected app routes
-  if (isAppPath && !token && !isPublicPath) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
-  }
-
-  return NextResponse.next()
+  const loginUrl = new URL('/login', request.url)
+  const back = safeRedirectPath(pathname + search)
+  if (back) loginUrl.searchParams.set('redirect', back)
+  const res = NextResponse.redirect(loginUrl)
+  return cookie ? withClearedSession(res) : res
 }
 
 export const config = {
