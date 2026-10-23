@@ -57,16 +57,18 @@ export default function CashFlowPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl font-semibold text-ink">Cash Flow</h1>
             <p className="text-sm text-ink-muted">Рух коштів по місяцях</p>
           </div>
+          {/* Icon-only below sm so the title keeps its width; the accessible name stays the same. */}
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 rounded-control border border-line bg-surface px-4 py-2 text-sm text-ink transition-colors hover:bg-canvas"
+            aria-label="Експорт CSV"
+            className="flex shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors hover:bg-canvas sm:px-4"
           >
             <Download className="h-4 w-4" />
-            Експорт CSV
+            <span className="hidden sm:inline">Експорт CSV</span>
           </button>
         </div>
 
@@ -76,11 +78,12 @@ export default function CashFlowPage() {
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
+              aria-pressed={period === p.value}
               className={cn(
-                'rounded-control px-4 py-1.5 text-sm font-medium transition-colors',
+                'rounded-control border px-4 py-1.5 text-sm transition-colors',
                 period === p.value
-                  ? 'bg-brand text-white'
-                  : 'border border-line bg-surface text-ink-muted hover:text-ink',
+                  ? 'border-brand bg-brand-soft font-semibold text-brand-soft-foreground'
+                  : 'border-line bg-surface font-medium text-ink-muted hover:text-ink',
               )}
             >
               {p.label}
@@ -94,7 +97,7 @@ export default function CashFlowPage() {
           const totalExpense = data.reduce((s, d) => s + d.expense, 0)
           const net = totalIncome - totalExpense
           return (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
                 { label: 'Доходи', value: totalIncome, tone: 'text-income' },
                 { label: 'Витрати', value: totalExpense, tone: 'text-expense' },

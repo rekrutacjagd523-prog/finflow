@@ -10,7 +10,7 @@ import { useShell } from '@/lib/hooks/useShell'
 // Header CTAs open the global forms on every page; below 640 px they show icons only (the label
 // stays as screen-reader text, so the accessible names never change).
 export function AppHeader() {
-  const { orgId, openTransactionForm, setDrawerOpen } = useShell()
+  const { orgId, openTransactionForm, drawerOpen, setDrawerOpen } = useShell()
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-2 px-3 lg:gap-4 lg:px-5">
@@ -19,6 +19,8 @@ export function AppHeader() {
         size="icon-lg"
         className="lg:hidden"
         aria-label="Відкрити рахунки"
+        aria-haspopup="dialog"
+        aria-expanded={drawerOpen}
         onClick={() => setDrawerOpen(true)}
       >
         <Menu />

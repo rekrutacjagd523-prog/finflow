@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
 export default function AnalyticsLayout({ children }: { children: ReactNode }) {
-  return <div className="min-h-full">{children}</div>
+  // A route layout kept on purpose (the shell already provides <main> and the scroll container).
+  return <>{children}</>
 }

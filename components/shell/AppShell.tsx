@@ -47,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <DialogContent
           data-testid="accounts-drawer"
           showCloseButton={false}
-          className="top-0 left-0 flex h-dvh max-h-dvh w-80 max-w-[calc(100%-3rem)] translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-r-panel p-0 sm:max-w-[calc(100%-3rem)] lg:hidden"
+          className="top-0 left-0 flex h-dvh max-h-dvh w-80 max-w-[calc(100%-3rem)] translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-r-panel p-0 duration-200 sm:max-w-[calc(100%-3rem)] lg:hidden data-open:zoom-in-100 data-open:slide-in-from-left data-closed:zoom-out-100 data-closed:slide-out-to-left motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none"
         >
           <DialogTitle className="sr-only">Рахунки</DialogTitle>
           <AccountsSidebar variant="drawer" onNavigate={() => setDrawerOpen(false)} />
