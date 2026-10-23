@@ -1,7 +1,5 @@
 'use client'
 
-import { auth } from '@/lib/firebase/firebase'
-
 const ALLOWED_PREFIX = '/api/enablebanking/'
 
 /**
@@ -28,18 +26,20 @@ function isAllowedPath(path: string): boolean {
 
 /**
  * fetch() for FinFlow's own /api/enablebanking/* routes from the browser.
- * Adds `Authorization: Bearer <Firebase ID token>` of the signed-in user.
- * getIdToken() returns the cached token and refreshes it only when it is about to expire.
+ * Authentication is the HttpOnly `__session` cookie, sent automatically on same-origin requests,
+ * so no token is handled here. A 401 means the session is gone: send the user to /login and
+ * bring them back afterwards.
  */
 export async function ebFetch(path: string, init?: RequestInit): Promise<Response> {
   if (!isAllowedPath(path)) {
     throw new Error('ebFetch: only /api/enablebanking/* paths are allowed')
   }
-  await auth.authStateReady()
-  const user = auth.currentUser
-  if (!user) throw new Error('not signed in')
-  const token = await user.getIdToken()
-  const headers = new Headers(init?.headers)
-  headers.set('Authorization', `Bearer ${token}`)
-  return fetch(path, { ...init, headers })
+  const res = await fetch(path, { ...init, credentials: 'same-origin' })
+  if (res.status === 401 && typeof window !== 'undefined') {
+    const back = encodeURIComponent(window.location.pathname + window.location.search)
+    // Not a React context (plain helper), so the router is unavailable: a full navigation is intended.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`/login?redirect=${back}`)
+  }
+  return res
 }

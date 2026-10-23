@@ -7,15 +7,13 @@ import {
   isSessionCookieValid,
   requireOrgMember,
   requireUser,
-  requireUserFromBearer,
   requireVerifiedUser,
 } from '@/lib/server/auth'
 
 // lib/server/auth.ts talks to Firebase only through getAdmin(); replace it with
-// a fake { auth: { verifyIdToken, verifySessionCookie, getUser }, db: { doc(path).get() } }.
+// a fake { auth: { verifySessionCookie, getUser }, db: { doc(path).get() } }.
 const admin = vi.hoisted(() => ({
   getAdmin: vi.fn(),
-  verifyIdToken: vi.fn(),
   verifySessionCookie: vi.fn(),
   getUser: vi.fn(),
   doc: vi.fn(),
@@ -25,14 +23,12 @@ const admin = vi.hoisted(() => ({
 vi.mock('@/lib/server/firebase-admin', () => ({ getAdmin: admin.getAdmin }))
 
 beforeEach(() => {
-  admin.verifyIdToken.mockReset()
   admin.verifySessionCookie.mockReset()
   admin.getUser.mockReset()
   admin.get.mockReset()
   admin.doc.mockReset().mockReturnValue({ get: admin.get })
   admin.getAdmin.mockReset().mockReturnValue({
     auth: {
-      verifyIdToken: admin.verifyIdToken,
       verifySessionCookie: admin.verifySessionCookie,
       getUser: admin.getUser,
     },
@@ -381,107 +377,6 @@ describe('isSessionCookieValid', () => {
     const err = await isSessionCookieValid('x').catch((e: unknown) => e)
 
     expect(err).toBeInstanceOf(HttpError)
-    expect(err).toMatchObject({ status: 500, message: 'server not configured' })
-  })
-})
-
-function requestWithAuth(authorization?: string): Request {
-  const headers = new Headers()
-  if (authorization !== undefined) headers.set('authorization', authorization)
-  return new Request('http://localhost/api/test', { headers })
-}
-
-describe('requireUserFromBearer', () => {
-  it('returns the uid of a valid, unrevoked ID token', async () => {
-    admin.verifyIdToken.mockResolvedValue({ uid: 'u1', email: 'a@example.com' })
-
-    await expect(requireUserFromBearer(requestWithAuth('Bearer good-token'))).resolves.toEqual({
-      uid: 'u1',
-    })
-    expect(admin.verifyIdToken).toHaveBeenCalledWith('good-token', true)
-  })
-
-  it('accepts the scheme case-insensitively', async () => {
-    admin.verifyIdToken.mockResolvedValue({ uid: 'u1' })
-
-    await expect(requireUserFromBearer(requestWithAuth('bearer good-token'))).resolves.toEqual({
-      uid: 'u1',
-    })
-  })
-
-  it.each([
-    ['no Authorization header', undefined],
-    ['an empty header', ''],
-    ['a non-Bearer scheme', 'Basic dXNlcjpwYXNz'],
-    ['Bearer without a token', 'Bearer'],
-    ['a token containing spaces', 'Bearer abc def'],
-  ])('rejects %s with 401 without calling Firebase', async (_label, header) => {
-    const err = await requireUserFromBearer(requestWithAuth(header)).catch((e: unknown) => e)
-
-    expect(err).toBeInstanceOf(HttpError)
-    expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
-    expect(admin.verifyIdToken).not.toHaveBeenCalled()
-  })
-
-  it('rejects with 401 when verifyIdToken throws (invalid, expired or revoked token)', async () => {
-    admin.verifyIdToken.mockRejectedValue(
-      Object.assign(new Error('revoked'), { code: 'auth/id-token-revoked' }),
-    )
-
-    const err = await requireUserFromBearer(requestWithAuth('Bearer revoked-token')).catch(
-      (e: unknown) => e,
-    )
-
-    expect(err).toBeInstanceOf(HttpError)
-    expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
-  })
-
-  it.each([
-    'auth/id-token-expired',
-    'auth/id-token-revoked',
-    'auth/argument-error',
-    'auth/invalid-id-token',
-    'auth/user-disabled',
-    'auth/user-not-found',
-  ])('maps token-validity error %s to 401', async (code) => {
-    admin.verifyIdToken.mockRejectedValue(Object.assign(new Error('x'), { code }))
-
-    const err = await requireUserFromBearer(requestWithAuth('Bearer t')).catch((e: unknown) => e)
-
-    expect(err).toBeInstanceOf(HttpError)
-    expect(err).toMatchObject({ status: 401, message: 'unauthorized' })
-  })
-
-  it.each([
-    ['an auth/internal-error', Object.assign(new Error('boom SECRET-BODY'), { code: 'auth/internal-error' }), 'auth/internal-error'],
-    ['a network error', Object.assign(new Error('getaddrinfo ENOTFOUND SECRET-BODY'), { code: 'ENOTFOUND' }), 'ENOTFOUND'],
-    ['an error without a code', new TypeError('fetch failed SECRET-BODY'), 'TypeError'],
-  ])('maps %s to 503, logging only the code or name', async (_label, failure, logged) => {
-    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
-    admin.verifyIdToken.mockRejectedValue(failure)
-
-    const err = await requireUserFromBearer(requestWithAuth('Bearer secret-token')).catch(
-      (e: unknown) => e,
-    )
-
-    expect(err).toBeInstanceOf(HttpError)
-    expect(err).toMatchObject({ status: 503, message: 'auth unavailable' })
-    expect(log).toHaveBeenCalledWith('verifyIdToken failed', logged)
-    const dump = JSON.stringify(log.mock.calls)
-    expect(dump).not.toContain('SECRET-BODY')
-    expect(dump).not.toContain('secret-token')
-    log.mockRestore()
-  })
-
-  it('does not mask a server configuration error as 401', async () => {
-    admin.getAdmin.mockImplementation(() => {
-      throw new HttpError(500, 'server not configured')
-    })
-
-    const err = await requireUserFromBearer(requestWithAuth('Bearer good-token')).catch(
-      (e: unknown) => e,
-    )
-
     expect(err).toMatchObject({ status: 500, message: 'server not configured' })
   })
 })

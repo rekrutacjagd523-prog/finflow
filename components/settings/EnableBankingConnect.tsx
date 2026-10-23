@@ -104,6 +104,11 @@ export default function EnableBankingConnect({ orgId }: Props) {
         body: JSON.stringify({ aspspName: inst.id, aspspCountry: inst.country, orgId }),
       })
       const data = await res.json()
+      if (res.status === 403 && data.error === 'email_not_verified') {
+        toast.error('Підтвердіть email, щоб підключити банк')
+        setConnecting(false)
+        return
+      }
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`)
       sessionStorage.setItem('eb_pending', JSON.stringify({ name: inst.name, authorizationId: data.authorizationId }))
       window.location.href = data.url

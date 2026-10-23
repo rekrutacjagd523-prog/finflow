@@ -4,9 +4,6 @@ import { HttpError } from '@/lib/server/http-error'
 import { assertSameOrigin } from '@/lib/server/request-guards'
 import { readSessionCookie } from '@/lib/server/session-cookie'
 
-// RFC 7235: the auth scheme is case-insensitive; the token is one opaque word.
-const BEARER = /^Bearer (\S+)$/i
-
 // Firestore document id allow-list for ids that arrive from the request.
 // Dots are excluded ('.' and '..' are invalid ids); ids matching __.*__ are
 // reserved by Firestore, so they are refused as well.
@@ -149,26 +146,6 @@ export async function isSessionCookieValid(cookie: string): Promise<boolean> {
     const err = toAuthHttpError(e, 'verifySessionCookie')
     if (err.status === 401) return false
     throw err
-  }
-}
-
-/**
- * Reads `Authorization: Bearer <Firebase ID token>` and verifies it with
- * revocation checking. Throws HttpError(401) for a missing/malformed header or
- * any token the Admin SDK rejects as invalid, and HttpError(503) when
- * verification itself fails (outage). Removed in S01 Task 7 (routes use requireUser).
- */
-export async function requireUserFromBearer(req: Request): Promise<{ uid: string }> {
-  const match = BEARER.exec(req.headers.get('authorization') ?? '')
-  if (!match) throw new HttpError(401, 'unauthorized')
-
-  // Outside the try: a missing service account must surface as 500, not 401.
-  const { auth } = getAdmin()
-  try {
-    const decoded = await auth.verifyIdToken(match[1], true)
-    return { uid: decoded.uid }
-  } catch (e) {
-    throw toAuthHttpError(e, 'verifyIdToken')
   }
 }
 
