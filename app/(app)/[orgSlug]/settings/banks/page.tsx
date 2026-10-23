@@ -4,8 +4,9 @@ import { useParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import EnableBankingConnect from '@/components/settings/EnableBankingConnect'
 
-// The Enable Banking callback returns here (`?eb_auth=` / `?eb_error=`); EnableBankingConnect
-// consumes those values (unchanged in S01A).
+// The Enable Banking callback returns here (`?eb_auth=` / `?eb_error=`). EnableBankingConnect
+// (unchanged in S01A) consumes only `eb_auth`; a user who cancels at the bank lands here with
+// `eb_error=1` and sees no message yet (known gap, tracked as a follow-up).
 export default function BanksSettingsPage() {
   const params = useParams()
   const orgId = params.orgSlug as string

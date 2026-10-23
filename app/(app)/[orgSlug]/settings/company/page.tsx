@@ -40,14 +40,20 @@ export default function CompanySettingsPage() {
     setSaving(true)
     try {
       await updateDoc(doc(db, 'organizations', orgId), { name, currency })
-      // Reload the org so the header and the sidebar total show the new name and currency.
-      await switchOrg(orgId)
-      toast.success('Збережено')
     } catch {
       toast.error('Помилка збереження')
-    } finally {
       setSaving(false)
+      return
     }
+    toast.success('Збережено')
+    // Reload the org so the header and the sidebar total show the new name and currency.
+    // The save already succeeded, so a failed refresh must not be reported as a failed save.
+    try {
+      await switchOrg(orgId)
+    } catch {
+      // The shell keeps showing the previous values until the next load.
+    }
+    setSaving(false)
   }
 
   const isChanged = org && (name !== org.name || currency !== org.currency)

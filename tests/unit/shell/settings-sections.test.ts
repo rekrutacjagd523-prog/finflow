@@ -37,6 +37,10 @@ describe('activeSettingsSection', () => {
     expect(activeSettingsSection(path, 'org1')).toBe(section)
   })
 
+  it('matches an org id that needs encoding against the encoded pathname', () => {
+    expect(activeSettingsSection('/org%201/settings/banks', 'org 1')).toBe('banks')
+  })
+
   it.each(['/org1/settings', '/org1/settings/unknown', '/org2/settings/banks', '/org1/transactions', '/'])(
     '%s -> null',
     (path) => {
