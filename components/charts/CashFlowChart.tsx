@@ -13,11 +13,12 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { MonthlyData } from '@/lib/utils/analytics'
+import type { CashFlowBucket } from '@/lib/utils/analytics'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface CashFlowChartProps {
-  data: MonthlyData[]
+  /** Months or days of the selected period (`buildCashFlow`); the x axis shows `label`. */
+  data: CashFlowBucket[]
   loading?: boolean
 }
 
@@ -101,7 +102,7 @@ export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
       <ComposedChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={TOKEN_COLORS.line} vertical={false} />
         <XAxis
-          dataKey="month"
+          dataKey="label"
           tick={{ fontSize: 12, fill: TOKEN_COLORS.inkMuted }}
           axisLine={false}
           tickLine={false}

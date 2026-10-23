@@ -6,24 +6,10 @@ import { useTransactions } from '@/lib/hooks/useTransactions'
 import { useShell } from '@/lib/hooks/useShell'
 import { buildPL } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
-import { cn } from '@/lib/utils'
+import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
 import PLTable from '@/components/charts/PLTable'
 import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
-import { Download } from 'lucide-react'
-
-const PERIODS = [
-  { label: '3М', value: 3 },
-  { label: '6М', value: 6 },
-  { label: '12М', value: 12 },
-]
-
-function getMonthKeys(months: number): string[] {
-  const now = new Date()
-  return Array.from({ length: months }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  })
-}
+import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 
 export default function PLPage() {
   const params = useParams()
@@ -33,16 +19,16 @@ export default function PLPage() {
   // Categories come from ShellProvider (one subscription, one default-category seed per org).
   const { incomeCategories, expenseCategories, categoriesLoading: catLoading } = useShell()
   const categories = [...incomeCategories, ...expenseCategories]
-  const [period, setPeriod] = useState(6)
+  const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
+  // The browser clock, read once per visit (presets resolve against it).
+  const [now] = useState(() => new Date())
 
   const loading = txLoading || catLoading
 
-  const rows = useMemo(
-    () => buildPL(transactions, categories, period),
-    [transactions, categories, period]
+  const { monthKeys, rows } = useMemo(
+    () => buildPL(transactions, categories, resolvePeriod(period, now)),
+    [transactions, categories, period, now]
   )
-
-  const monthKeys = useMemo(() => getMonthKeys(period), [period])
 
   const handleExport = () => {
     exportToCSV(
@@ -52,47 +38,20 @@ export default function PLPage() {
         ...Object.fromEntries(monthKeys.map((k) => [k, row.months[k] ?? 0])),
         Всього: row.total,
       })),
-      `pl-${period}m`
+      `pl-${periodSlug(period)}`
     )
   }
 
   return (
     // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
+        {/* Header and the report toolbar (period first, then the actions), as in Finmap */}
+        <div className="space-y-4">
+          <div>
             <h1 className="font-display text-xl font-semibold text-ink">P&L — Прибутки та збитки</h1>
             <p className="text-sm text-ink-muted">По категоріях за обраний період</p>
           </div>
-          {/* Icon-only below sm so the title keeps its width; the accessible name stays the same. */}
-          <button
-            onClick={handleExport}
-            aria-label="Експорт CSV"
-            className="flex shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors hover:bg-canvas sm:px-4"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Експорт CSV</span>
-          </button>
-        </div>
-
-        {/* Period selector */}
-        <div className="flex gap-2">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              aria-pressed={period === p.value}
-              className={cn(
-                'rounded-control border px-4 py-1.5 text-sm transition-colors',
-                period === p.value
-                  ? 'border-brand bg-brand-soft font-semibold text-brand-soft-foreground'
-                  : 'border-line bg-surface font-medium text-ink-muted hover:text-ink',
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
+          <ReportToolbar period={period} onPeriodChange={setPeriod} onExport={handleExport} />
         </div>
 
         {/* Summary + pie charts */}

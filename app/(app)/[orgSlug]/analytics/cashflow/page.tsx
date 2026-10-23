@@ -2,19 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import { useTransactions } from '@/lib/hooks/useTransactions'
-import { buildCashFlow, MonthlyData } from '@/lib/utils/analytics'
+import { buildCashFlow } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
+import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
 import { cn } from '@/lib/utils'
 import CashFlowChart from '@/components/charts/CashFlowChart'
-import { Download } from 'lucide-react'
+import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-
-const PERIODS = [
-  { label: '3М', value: 3 },
-  { label: '6М', value: 6 },
-  { label: '12М', value: 12 },
-]
 
 function formatNum(n: number): string {
   return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(n)
@@ -25,63 +20,39 @@ export default function CashFlowPage() {
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
   const { transactions, loading } = useTransactions(orgId)
-  const [period, setPeriod] = useState(12)
+  const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
+  // The browser clock, read once per visit (presets resolve against it).
+  const [now] = useState(() => new Date())
 
-  const data: MonthlyData[] = useMemo(
-    () => buildCashFlow(transactions, period),
-    [transactions, period]
+  const { granularity, buckets: data } = useMemo(
+    () => buildCashFlow(transactions, resolvePeriod(period, now)),
+    [transactions, period, now]
   )
+  const unitLabel = granularity === 'month' ? 'Місяць' : 'День'
 
   const handleExport = () => {
     exportToCSV(
       data.map((row) => ({
-        Місяць: row.month,
+        [unitLabel]: row.label,
         Дохід: row.income,
         Витрата: row.expense,
         Різниця: row.net,
         Баланс: row.balance,
       })),
-      `cashflow-${period}m`
+      `cashflow-${periodSlug(period)}`
     )
   }
 
   return (
     // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
+        {/* Header and the report toolbar (period first, then the actions), as in Finmap */}
+        <div className="space-y-4">
+          <div>
             <h1 className="font-display text-xl font-semibold text-ink">Cash Flow</h1>
-            <p className="text-sm text-ink-muted">Рух коштів по місяцях</p>
+            <p className="text-sm text-ink-muted">Рух коштів за обраний період</p>
           </div>
-          {/* Icon-only below sm so the title keeps its width; the accessible name stays the same. */}
-          <button
-            onClick={handleExport}
-            aria-label="Експорт CSV"
-            className="flex shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors hover:bg-canvas sm:px-4"
-          >
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Експорт CSV</span>
-          </button>
-        </div>
-
-        {/* Period selector */}
-        <div className="flex gap-2">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              aria-pressed={period === p.value}
-              className={cn(
-                'rounded-control border px-4 py-1.5 text-sm transition-colors',
-                period === p.value
-                  ? 'border-brand bg-brand-soft font-semibold text-brand-soft-foreground'
-                  : 'border-line bg-surface font-medium text-ink-muted hover:text-ink',
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
+          <ReportToolbar period={period} onPeriodChange={setPeriod} onExport={handleExport} />
         </div>
 
         {/* Summary cards */}
@@ -92,13 +63,13 @@ export default function CashFlowPage() {
           return (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
-                { label: 'Доходи', value: totalIncome, tone: 'text-income' },
-                { label: 'Витрати', value: totalExpense, tone: 'text-expense' },
-                { label: 'Різниця', value: net, tone: net >= 0 ? 'text-income' : 'text-expense' },
+                { id: 'income', label: 'Доходи', value: totalIncome, tone: 'text-income' },
+                { id: 'expense', label: 'Витрати', value: totalExpense, tone: 'text-expense' },
+                { id: 'net', label: 'Різниця', value: net, tone: net >= 0 ? 'text-income' : 'text-expense' },
               ].map((card) => (
                 <div key={card.label} className="rounded-panel border border-line bg-surface px-5 py-4">
                   <p className="mb-1 text-xs text-ink-muted">{card.label}</p>
-                  <p className={cn('text-xl font-bold tabular-nums', card.tone)}>
+                  <p data-testid={`cashflow-total-${card.id}`} className={cn('text-xl font-bold tabular-nums', card.tone)}>
                     {card.value >= 0 && card.label === 'Різниця' ? '+' : ''}{formatNum(card.value)}
                   </p>
                 </div>
@@ -115,7 +86,9 @@ export default function CashFlowPage() {
         {/* Detail table */}
         <div className="overflow-hidden rounded-panel border border-line bg-surface">
           <div className="border-b border-line px-6 py-4">
-            <h2 className="text-sm font-semibold text-ink">Деталізація по місяцях</h2>
+            <h2 className="text-sm font-semibold text-ink">
+              {granularity === 'month' ? 'Деталізація по місяцях' : 'Деталізація по днях'}
+            </h2>
           </div>
           {loading ? (
             <div className="space-y-3 p-6">
@@ -135,7 +108,7 @@ export default function CashFlowPage() {
               <table className="w-full text-sm tabular-nums">
                 <thead>
                   <tr className="bg-canvas text-xs uppercase tracking-wide text-ink-muted">
-                    <th className="px-6 py-3 text-left font-semibold">Місяць</th>
+                    <th className="px-6 py-3 text-left font-semibold">{unitLabel}</th>
                     <th className="px-6 py-3 text-right font-semibold">Дохід</th>
                     <th className="px-6 py-3 text-right font-semibold">Витрата</th>
                     <th className="px-6 py-3 text-right font-semibold">Різниця</th>
@@ -144,8 +117,8 @@ export default function CashFlowPage() {
                 </thead>
                 <tbody>
                   {data.map((row) => (
-                    <tr key={row.monthKey} className="border-t border-line hover:bg-canvas">
-                      <td className="px-6 py-3 font-medium text-ink">{row.month}</td>
+                    <tr key={row.key} className="border-t border-line hover:bg-canvas">
+                      <td className="px-6 py-3 font-medium text-ink">{row.label}</td>
                       <td className="px-6 py-3 text-right text-income">
                         {row.income > 0 ? `+${formatNum(row.income)}` : '—'}
                       </td>

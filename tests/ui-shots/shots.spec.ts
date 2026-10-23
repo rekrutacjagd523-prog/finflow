@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell } from '../e2e/helpers/app-ui'
 import { seedDoc } from '../e2e/helpers/emulator-firestore'
+import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
 
 const OUT_DIR = join(process.cwd(), 'ui-shots')
 const VIEWPORTS = [
@@ -148,6 +149,24 @@ test.describe('ui shots', () => {
         await expect(page.getByRole('navigation', { name: 'Розділи аналітики' })).toBeVisible()
         if (report.charts) await page.waitForTimeout(1500)
         await shot(`analytics-${report.path}`)
+
+        if (report.path === 'cashflow') {
+          // The report period filter: the open menu, then the date range picker with a range.
+          const pill = page.getByRole('button', { name: /^Період:/ })
+          await pill.click()
+          await expect(page.getByRole('menuitemradio', { name: 'На поточний рік' })).toBeVisible()
+          await shot('analytics-cashflow-period-menu')
+          await page.getByRole('menuitemradio', { name: 'Обрати дати' }).click()
+          const picker = page.getByRole('dialog', { name: 'Обрати дати' })
+          await expect(picker).toBeVisible()
+          const today = new Date()
+          const first = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1))
+          await picker.getByRole('button', { name: formatDayLongUtc(first), exact: true }).click()
+          await picker.getByRole('button', { name: formatDayLongUtc(today), exact: true }).click()
+          await shot('analytics-cashflow-period-picker')
+          await page.keyboard.press('Escape')
+          await expect(picker).toBeHidden()
+        }
       }
 
       // The way into settings: the profile menu, then the settings screen with its own menu.

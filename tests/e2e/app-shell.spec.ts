@@ -2,6 +2,8 @@ import { test, expect, type APIRequestContext, type Locator, type Page } from '@
 import { registerViaUi, waitForShell } from './helpers/app-ui'
 import { signInEmulatorUser } from './helpers/emulator-auth'
 import { seedDoc } from './helpers/emulator-firestore'
+import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
+import { formatPeriodLabel } from '../../lib/utils/period'
 
 const NEEDS_EMULATORS =
   'Needs the Auth + Firestore emulators. Run: firebase emulators:exec --only auth,firestore --project demo-finflow "npm run test:e2e"'
@@ -465,6 +467,271 @@ test.describe('app shell (emulators)', () => {
       return { background: style.backgroundColor, color: style.color }
     })
     expect(dialogColors).toEqual({ background: 'rgb(255, 255, 255)', color: 'rgb(23, 32, 29)' })
+  })
+})
+
+/**
+ * Report data relative to the real current date (the app reads the browser clock), in UTC like
+ * the reports: 300 today, 500 in the middle of last year, 70 on the 10th of the previous month
+ * (last year when this runs in January). Amounts stay below 1000 (no group separator) and their
+ * sums are unique, so a total identifies its period.
+ */
+async function seedReportData(request: APIRequestContext, orgId: string) {
+  const now = new Date()
+  const y = now.getUTCFullYear()
+  const m = now.getUTCMonth()
+  const prevMonthDay = (day: number) => new Date(Date.UTC(y, m - 1, day, 12))
+  const txs = [
+    { id: 'rep-today', amount: 300, date: now },
+    { id: 'rep-last-year', amount: 500, date: new Date(Date.UTC(y - 1, 5, 15, 12)) },
+    { id: 'rep-prev-month', amount: 70, date: prevMonthDay(10) },
+  ]
+  await seedAccount(request, orgId, 'acc-rep', { name: 'Reports', balance: 0, currency: 'UAH' })
+  for (const t of txs) {
+    await seedDoc(request, `organizations/${orgId}/transactions`, t.id, {
+      type: 'income',
+      accountId: 'acc-rep',
+      amount: t.amount,
+      currency: 'UAH',
+      date: t.date,
+      description: `Report ${t.id}`,
+      isRecurring: false,
+      tags: [],
+      fileUrls: [],
+      orgId,
+      createdAt: new Date(),
+    })
+  }
+  const prevMonthInThisYear = prevMonthDay(10).getUTCFullYear() === y
+  return {
+    currentYear: String(300 + (prevMonthInThisYear ? 70 : 0)),
+    prevYear: String(500 + (prevMonthInThisYear ? 0 : 70)),
+    /** The 9th-11th of the previous month: only the 70. */
+    custom: { start: prevMonthDay(9), end: prevMonthDay(11), total: '70' },
+  }
+}
+
+const REPORT_MENU = [
+  'На поточний рік',
+  'За попередній рік',
+  'За поточний тиждень',
+  'За останній тиждень',
+  'За поточний місяць',
+  'За останній місяць',
+  'Обрати дати',
+]
+
+function periodPill(page: Page) {
+  return page.getByRole('button', { name: /^Період:/ })
+}
+
+test.describe('report period filter', () => {
+  test.skip(!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST, NEEDS_EMULATORS)
+
+  test('Cash Flow: the current year by default; «За попередній рік» changes the label, the numbers and the CSV name', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'period')
+    await waitForShell(page, user.companyName)
+    const expected = await seedReportData(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+
+    // The old month pills are gone; the toolbar has the period pill and the CSV icon button.
+    await expect(page.getByRole('button', { name: '12М' })).toHaveCount(0)
+    const pill = periodPill(page)
+    await expect(pill).toContainText('На поточний рік')
+    await expect(pill).toHaveAttribute('aria-haspopup', 'menu')
+    await expect(pill).toHaveAttribute('aria-expanded', 'false')
+    const income = page.getByTestId('cashflow-total-income')
+    await expect(income).toHaveText(expected.currentYear)
+
+    await pill.click()
+    const menu = page.getByRole('menu')
+    await expect(menu.getByText('ЗА ДАТОЮ ОПЕРАЦІЇ', { exact: true })).toBeVisible()
+    await expect(pill).toHaveAttribute('aria-expanded', 'true')
+    const items = menu.getByRole('menuitemradio')
+    await expect(items).toHaveText(REPORT_MENU)
+    await expect(items.filter({ hasText: 'На поточний рік' })).toHaveAttribute('aria-checked', 'true')
+    await expect(items.filter({ hasText: 'За попередній рік' })).toHaveAttribute('aria-checked', 'false')
+
+    await items.filter({ hasText: 'За попередній рік' }).click()
+    await expect(menu).toBeHidden()
+    await expect(pill).toContainText('За попередній рік')
+    await expect(income).toHaveText(expected.prevYear)
+
+    // The CSV file name carries the period.
+    const download = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Експорт CSV', exact: true }).click()
+    expect((await download).suggestedFilename()).toBe('cashflow-prev-year.csv')
+
+    // The selection is checked when the menu opens again; Esc closes it and focus returns to the pill.
+    await pill.click()
+    await expect(menu.getByRole('menuitemradio', { name: 'За попередній рік' })).toHaveAttribute('aria-checked', 'true')
+    await expect(menu.getByRole('menuitemradio', { name: 'На поточний рік' })).toHaveAttribute('aria-checked', 'false')
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(pill).toBeFocused()
+    await expect(pill).toContainText('За попередній рік')
+  })
+
+  test('keyboard: Enter opens the menu, ArrowDown moves, Enter selects; Esc closes', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'periodkb')
+    await waitForShell(page, user.companyName)
+    const expected = await seedReportData(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+    const pill = periodPill(page)
+    const income = page.getByTestId('cashflow-total-income')
+    await expect(income).toHaveText(expected.currentYear)
+
+    await pill.focus()
+    await page.keyboard.press('Enter')
+    const menu = page.getByRole('menu')
+    await expect(menu).toBeVisible()
+    await expect(menu.getByRole('menuitemradio', { name: 'На поточний рік' })).toBeFocused()
+    await page.keyboard.press('ArrowDown')
+    await expect(menu.getByRole('menuitemradio', { name: 'За попередній рік' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeHidden()
+    await expect(pill).toContainText('За попередній рік')
+    await expect(income).toHaveText(expected.prevYear)
+    await expect(pill).toBeFocused()
+
+    await page.keyboard.press('Enter')
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(pill).toBeFocused()
+  })
+
+  test('«Обрати дати»: a range picked in the calendar becomes the period; Cancel and Esc keep the old one', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'periodcal')
+    await waitForShell(page, user.companyName)
+    const expected = await seedReportData(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+    const pill = periodPill(page)
+    const income = page.getByTestId('cashflow-total-income')
+    await expect(income).toHaveText(expected.currentYear)
+
+    // Cancel keeps the period.
+    await pill.click()
+    await page.getByRole('menuitemradio', { name: 'Обрати дати' }).click()
+    const picker = page.getByRole('dialog', { name: 'Обрати дати' })
+    await expect(picker).toBeVisible()
+    await expect(picker.getByRole('grid')).toBeVisible()
+    await expect(picker.getByRole('columnheader')).toHaveText(['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'])
+    // Focus starts on a day of the grid (today).
+    await expect
+      .poll(() => page.evaluate(() => !!document.activeElement?.closest('[role="grid"]')))
+      .toBe(true)
+    await picker.getByRole('button', { name: 'Скасувати', exact: true }).click()
+    await expect(picker).toBeHidden()
+    await expect(pill).toContainText('На поточний рік')
+    await expect(pill).toBeFocused()
+
+    // Pick the 9th-11th of the previous month.
+    await pill.click()
+    await page.getByRole('menuitemradio', { name: 'Обрати дати' }).click()
+    await expect(picker).toBeVisible()
+    const apply = picker.getByRole('button', { name: 'Застосувати', exact: true })
+    await expect(apply).toBeDisabled()
+    await picker.getByRole('button', { name: 'Попередній місяць' }).click()
+    await picker.getByRole('button', { name: formatDayLongUtc(expected.custom.start), exact: true }).click()
+    await expect(picker).toContainText('Оберіть другу дату')
+    await picker.getByRole('button', { name: formatDayLongUtc(expected.custom.end), exact: true }).click()
+    const rangeLabel = formatPeriodLabel({ preset: 'custom', start: expected.custom.start, end: expected.custom.end })
+    await expect(picker).toContainText(rangeLabel)
+    await apply.click()
+    await expect(picker).toBeHidden()
+    await expect(pill).toContainText(rangeLabel)
+    await expect(pill).toBeFocused()
+    await expect(income).toHaveText(expected.custom.total)
+    // Three days: the table is by day.
+    await expect(page.getByRole('heading', { name: 'Деталізація по днях' })).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: 'День' })).toBeVisible()
+
+    // The custom entry is checked; Esc in the reopened picker keeps the range.
+    await pill.click()
+    await expect(page.getByRole('menuitemradio', { name: 'Обрати дати' })).toHaveAttribute('aria-checked', 'true')
+    await page.getByRole('menuitemradio', { name: 'Обрати дати' }).click()
+    await expect(picker).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(picker).toBeHidden()
+    await expect(pill).toContainText(rangeLabel)
+    await expect(income).toHaveText(expected.custom.total)
+  })
+
+  test('P&L has the same toolbar and period behaviour', async ({ page, request }) => {
+    const user = await registerViaUi(page, 'periodpl')
+    await waitForShell(page, user.companyName)
+    const expected = await seedReportData(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/pl`)
+    await waitForShell(page, user.companyName)
+
+    await expect(page.getByRole('button', { name: '6М' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Експорт CSV', exact: true })).toBeVisible()
+    const pill = periodPill(page)
+    await expect(pill).toContainText('На поточний рік')
+    const incomeTotal = page.getByRole('row').filter({ hasText: 'Всього доходи' }).getByRole('cell').last()
+    await expect(incomeTotal).toHaveText(expected.currentYear)
+
+    await pill.click()
+    await expect(page.getByRole('menu').getByText('ЗА ДАТОЮ ОПЕРАЦІЇ', { exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitemradio')).toHaveText(REPORT_MENU)
+    await page.getByRole('menuitemradio', { name: 'За попередній рік' }).click()
+    await expect(pill).toContainText('За попередній рік')
+    await expect(incomeTotal).toHaveText(expected.prevYear)
+
+    await pill.click()
+    await page.getByRole('menuitemradio', { name: 'Обрати дати' }).click()
+    const picker = page.getByRole('dialog', { name: 'Обрати дати' })
+    await picker.getByRole('button', { name: 'Попередній місяць' }).click()
+    await picker.getByRole('button', { name: formatDayLongUtc(expected.custom.start), exact: true }).click()
+    await picker.getByRole('button', { name: formatDayLongUtc(expected.custom.end), exact: true }).click()
+    await picker.getByRole('button', { name: 'Застосувати', exact: true }).click()
+    await expect(pill).toContainText(formatPeriodLabel({ preset: 'custom', ...expected.custom }))
+    await expect(incomeTotal).toHaveText(expected.custom.total)
+  })
+
+  test('on a 390 px phone the menu and the calendar fit the screen and work', async ({ page, request }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    const user = await registerViaUi(page, 'periodphone')
+    await waitForShell(page, user.companyName)
+    const expected = await seedReportData(request, user.orgId)
+    await page.goto(`/${user.orgId}/analytics/cashflow`)
+    await waitForShell(page, user.companyName)
+    const pill = periodPill(page)
+    const income = page.getByTestId('cashflow-total-income')
+    await expect(income).toHaveText(expected.currentYear)
+    expect((await pill.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+
+    await pill.click()
+    const menu = page.getByRole('menu')
+    await expect(menu).toBeVisible()
+    const menuBox = (await menu.boundingBox())!
+    expect(menuBox.x).toBeGreaterThanOrEqual(0)
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(390)
+    for (const item of await menu.getByRole('menuitemradio').all()) {
+      expect((await item.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    }
+    await menu.getByRole('menuitemradio', { name: 'За попередній рік' }).click()
+    await expect(pill).toContainText('За попередній рік')
+    await expect(income).toHaveText(expected.prevYear)
+
+    await pill.click()
+    await page.getByRole('menuitemradio', { name: 'Обрати дати' }).click()
+    const picker = page.getByRole('dialog', { name: 'Обрати дати' })
+    await expect(picker).toBeVisible()
+    const pickerBox = (await picker.boundingBox())!
+    expect(pickerBox.x).toBeGreaterThanOrEqual(0)
+    expect(pickerBox.x + pickerBox.width).toBeLessThanOrEqual(390)
+    const day = picker.getByRole('button', { name: formatDayLongUtc(expected.custom.start), exact: true })
+    await picker.getByRole('button', { name: 'Попередній місяць' }).click()
+    expect((await day.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    await day.click()
+    await picker.getByRole('button', { name: formatDayLongUtc(expected.custom.end), exact: true }).click()
+    await picker.getByRole('button', { name: 'Застосувати', exact: true }).click()
+    await expect(income).toHaveText(expected.custom.total)
   })
 })
 
