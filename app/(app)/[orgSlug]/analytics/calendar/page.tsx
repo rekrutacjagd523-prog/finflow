@@ -2,16 +2,18 @@
 
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
+import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
 import CalendarView from '@/components/charts/CalendarView'
-import { ArrowLeft } from 'lucide-react'
 
 export default function CalendarPage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
-  const { transactions, loading } = useTransactions(orgId)
+  const { transactions, loading: txLoading } = useTransactions(orgId)
+  // Totals are shown in the company currency, so wait for the org as well.
+  const { org } = useShell()
+  const loading = txLoading || !org
 
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
@@ -28,31 +30,22 @@ export default function CalendarPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb] p-6 md:p-10">
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/${orgSlug}/analytics`}
-            className="p-2 rounded-lg hover:bg-white transition-colors text-[#6b7280] hover:text-[#111111]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold text-[#111111]">Календар</h1>
-            <p className="text-sm text-[#6b7280]">Щоденний рух грошей</p>
-          </div>
-        </div>
-
-        {/* Calendar */}
-        <CalendarView
-          transactions={transactions}
-          year={year}
-          month={month}
-          onNavigate={handleNavigate}
-          loading={loading}
-        />
+    // The shared container and the reports' sub-navigation come from analytics/layout.tsx; the
+    // day list keeps a narrower, readable width inside it.
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <h1 className="font-display text-xl font-semibold text-ink">Календар</h1>
+        <p className="text-sm text-ink-muted">Щоденний рух грошей</p>
       </div>
-    </main>
+
+      <CalendarView
+        transactions={transactions}
+        year={year}
+        month={month}
+        onNavigate={handleNavigate}
+        currency={org?.currency ?? 'UAH'}
+        loading={loading}
+      />
+    </div>
   )
 }

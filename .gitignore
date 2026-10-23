@@ -49,6 +49,9 @@ playwright-report/
 /blob-report/
 /playwright/.cache/
 /tests/screenshots/
+# S01A visual review (npm run ui:shots) and local Finmap reference screenshots
+/ui-shots/
+/.playwright-mcp/
 
 # local logs (dev server, Firebase emulators)
 dev.log
@@ -58,3 +61,6 @@ ui-debug.log*
 
 # committed env template (names only)
 !.env.example
+
+# Brainstorming visual companion sessions (local mockups)
+.superpowers/

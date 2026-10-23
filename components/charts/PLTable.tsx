@@ -1,6 +1,9 @@
 'use client'
 
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { PLRow } from '@/lib/utils/analytics'
+import { cn } from '@/lib/utils'
 
 interface PLTableProps {
   rows: PLRow[]
@@ -22,23 +25,23 @@ function formatNum(n: number): string {
 
 function TableSkeleton({ cols }: { cols: number }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#e5e7eb]">
+    <div className="overflow-x-auto rounded-xl border border-line">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[#f9fafb]">
+          <tr className="bg-canvas">
             {Array.from({ length: cols + 2 }).map((_, i) => (
               <th key={i} className="h-10 px-4">
-                <div className="h-3 bg-[#e5e7eb] rounded animate-pulse" />
+                <div className="h-3 bg-line rounded animate-pulse" />
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {Array.from({ length: 5 }).map((_, i) => (
-            <tr key={i} className="border-t border-[#e5e7eb]">
+            <tr key={i} className="border-t border-line">
               {Array.from({ length: cols + 2 }).map((_, j) => (
                 <td key={j} className="h-9 px-4">
-                  <div className="h-3 bg-[#f9fafb] rounded animate-pulse" />
+                  <div className="h-3 bg-canvas rounded animate-pulse" />
                 </td>
               ))}
             </tr>
@@ -50,6 +53,7 @@ function TableSkeleton({ cols }: { cols: number }) {
 }
 
 export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
+  const { orgSlug } = useParams<{ orgSlug: string }>()
   if (loading) return <TableSkeleton cols={monthKeys.length} />
 
   const incomeRows = rows.filter(r => r.type === 'income')
@@ -63,21 +67,21 @@ export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
 
   if (!rows.length) {
     return (
-      <div className="rounded-xl border border-[#e5e7eb] flex flex-col items-center justify-center gap-2 py-16">
-        <p className="text-[#6b7280]">Немає даних за цей період</p>
-        <a href="/transactions" className="text-[#00c896] text-sm underline underline-offset-2">
+      <div className="rounded-xl border border-line flex flex-col items-center justify-center gap-2 py-16">
+        <p className="text-ink-muted">Немає даних за цей період</p>
+        <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
           Додати транзакції →
-        </a>
+        </Link>
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#e5e7eb]">
+    <div className="overflow-x-auto rounded-xl border border-line">
       <table className="w-full text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
         <thead>
-          <tr className="bg-[#f9fafb] text-[#6b7280] text-xs uppercase tracking-wide">
-            <th className="sticky left-0 z-10 bg-[#f9fafb] px-4 py-3 text-left font-semibold min-w-[180px]">
+          <tr className="bg-canvas text-ink-muted text-xs uppercase tracking-wide">
+            <th className="sticky left-0 z-10 bg-canvas px-4 py-3 text-left font-semibold min-w-[180px]">
               Категорія
             </th>
             {monthKeys.map((key) => (
@@ -90,10 +94,10 @@ export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
         </thead>
         <tbody>
           {/* INCOME section */}
-          <tr className="bg-[#f0fdf4]">
+          <tr className="bg-brand-soft">
             <td
               colSpan={monthKeys.length + 2}
-              className="sticky left-0 px-4 py-2 text-xs font-bold text-[#22c55e] uppercase tracking-wide"
+              className="sticky left-0 px-4 py-2 text-xs font-bold text-income uppercase tracking-wide"
             >
               Доходи
             </td>
@@ -101,44 +105,44 @@ export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
           {incomeRows.map((row) => (
             <tr
               key={row.categoryId}
-              className="border-t border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors"
+              className="border-t border-line hover:bg-canvas transition-colors"
             >
-              <td className="sticky left-0 z-10 bg-white hover:bg-[#f9fafb] px-4 py-2.5 text-[#111111]">
+              <td className="sticky left-0 z-10 bg-surface hover:bg-canvas px-4 py-2.5 text-ink">
                 {row.categoryName}
               </td>
               {monthKeys.map((key) => (
                 <td
                   key={key}
-                  className="px-4 py-2.5 text-right text-[#22c55e]"
+                  className="px-4 py-2.5 text-right text-income"
                 >
                   {formatNum(row.months[key] ?? 0)}
                 </td>
               ))}
-              <td className="px-4 py-2.5 text-right font-semibold text-[#22c55e]">
+              <td className="px-4 py-2.5 text-right font-semibold text-income">
                 {formatNum(row.total)}
               </td>
             </tr>
           ))}
           {/* Income total row */}
-          <tr className="border-t-2 border-[#e5e7eb] bg-[#f0fdf4]">
-            <td className="sticky left-0 z-10 bg-[#f0fdf4] px-4 py-2.5 font-semibold text-[#111111]">
+          <tr className="border-t-2 border-line bg-brand-soft">
+            <td className="sticky left-0 z-10 bg-brand-soft px-4 py-2.5 font-semibold text-ink">
               Всього доходи
             </td>
             {monthKeys.map((key) => (
-              <td key={key} className="px-4 py-2.5 text-right font-semibold text-[#22c55e]">
+              <td key={key} className="px-4 py-2.5 text-right font-semibold text-income">
                 {formatNum(totalIncome(key))}
               </td>
             ))}
-            <td className="px-4 py-2.5 text-right font-bold text-[#22c55e]">
+            <td className="px-4 py-2.5 text-right font-bold text-income">
               {formatNum(totalIncome())}
             </td>
           </tr>
 
           {/* EXPENSE section */}
-          <tr className="bg-[#fef2f2]">
+          <tr className="bg-expense-soft">
             <td
               colSpan={monthKeys.length + 2}
-              className="sticky left-0 px-4 py-2 text-xs font-bold text-[#ef4444] uppercase tracking-wide"
+              className="sticky left-0 px-4 py-2 text-xs font-bold text-expense uppercase tracking-wide"
             >
               Витрати
             </td>
@@ -146,42 +150,42 @@ export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
           {expenseRows.map((row) => (
             <tr
               key={row.categoryId}
-              className="border-t border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors"
+              className="border-t border-line hover:bg-canvas transition-colors"
             >
-              <td className="sticky left-0 z-10 bg-white hover:bg-[#f9fafb] px-4 py-2.5 text-[#111111]">
+              <td className="sticky left-0 z-10 bg-surface hover:bg-canvas px-4 py-2.5 text-ink">
                 {row.categoryName}
               </td>
               {monthKeys.map((key) => (
                 <td
                   key={key}
-                  className="px-4 py-2.5 text-right text-[#ef4444]"
+                  className="px-4 py-2.5 text-right text-expense"
                 >
                   {formatNum(row.months[key] ?? 0)}
                 </td>
               ))}
-              <td className="px-4 py-2.5 text-right font-semibold text-[#ef4444]">
+              <td className="px-4 py-2.5 text-right font-semibold text-expense">
                 {formatNum(row.total)}
               </td>
             </tr>
           ))}
           {/* Expense total row */}
-          <tr className="border-t-2 border-[#e5e7eb] bg-[#fef2f2]">
-            <td className="sticky left-0 z-10 bg-[#fef2f2] px-4 py-2.5 font-semibold text-[#111111]">
+          <tr className="border-t-2 border-line bg-expense-soft">
+            <td className="sticky left-0 z-10 bg-expense-soft px-4 py-2.5 font-semibold text-ink">
               Всього витрати
             </td>
             {monthKeys.map((key) => (
-              <td key={key} className="px-4 py-2.5 text-right font-semibold text-[#ef4444]">
+              <td key={key} className="px-4 py-2.5 text-right font-semibold text-expense">
                 {formatNum(totalExpense(key))}
               </td>
             ))}
-            <td className="px-4 py-2.5 text-right font-bold text-[#ef4444]">
+            <td className="px-4 py-2.5 text-right font-bold text-expense">
               {formatNum(totalExpense())}
             </td>
           </tr>
 
           {/* PROFIT / LOSS row */}
-          <tr className="border-t-2 border-[#111111]">
-            <td className="sticky left-0 z-10 bg-white px-4 py-3 font-bold text-[#111111]">
+          <tr className="border-t-2 border-ink">
+            <td className="sticky left-0 z-10 bg-surface px-4 py-3 font-bold text-ink">
               Прибуток / Збиток
             </td>
             {monthKeys.map((key) => {
@@ -189,17 +193,13 @@ export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
               return (
                 <td
                   key={key}
-                  className="px-4 py-3 text-right font-bold"
-                  style={{ color: val >= 0 ? '#22c55e' : '#ef4444' }}
+                  className={cn('px-4 py-3 text-right font-bold', val >= 0 ? 'text-income' : 'text-expense')}
                 >
                   {val >= 0 ? '+' : ''}{formatNum(val)}
                 </td>
               )
             })}
-            <td
-              className="px-4 py-3 text-right font-bold text-base"
-              style={{ color: profit() >= 0 ? '#22c55e' : '#ef4444' }}
-            >
+            <td className={cn('px-4 py-3 text-right font-bold text-base', profit() >= 0 ? 'text-income' : 'text-expense')}>
               {profit() >= 0 ? '+' : ''}{formatNum(profit())}
             </td>
           </tr>

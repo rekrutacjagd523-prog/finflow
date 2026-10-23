@@ -1,12 +1,32 @@
 import { Transaction, Account, Category } from '@/types'
+import {
+  DAY_MS,
+  addDaysUtc,
+  dayKeyUtc,
+  endOfDayUtc,
+  shiftMonth,
+  startOfDayUtc,
+  type YearMonth,
+} from '@/lib/utils/calendar-grid'
+import type { PeriodRange } from '@/lib/utils/period'
 
-export interface MonthlyData {
-  month: string       // "Січ 26", "Лют 26"
-  monthKey: string    // "2026-01"
+/** Cash Flow buckets are months for a range longer than this many days, days otherwise. */
+export const CASHFLOW_DAY_BUCKETS_MAX_DAYS = 31
+
+export type CashFlowGranularity = 'month' | 'day'
+
+export interface CashFlowBucket {
+  label: string       // month: "Січ 26"; day: "12 жов"
+  key: string         // month: "2026-01"; day: "2026-01-12" (UTC)
   income: number
   expense: number
-  balance: number     // running balance
+  balance: number     // running balance from the start of the range
   net: number         // income - expense
+}
+
+export interface CashFlowReport {
+  granularity: CashFlowGranularity
+  buckets: CashFlowBucket[]
 }
 
 export interface PLRow {
@@ -15,6 +35,12 @@ export interface PLRow {
   type: 'income' | 'expense'
   months: Record<string, number>  // { "2026-01": 5000, "2026-02": 3200 }
   total: number
+}
+
+export interface PLReport {
+  /** The months of the range, oldest first ("2026-01"); the table's columns. */
+  monthKeys: string[]
+  rows: PLRow[]
 }
 
 export interface DayData {
@@ -41,56 +67,122 @@ function formatMonthLabel(year: number, month: number): string {
   return `${UA_MONTHS[month]} ${String(year).slice(2)}`
 }
 
-export function buildCashFlow(transactions: Transaction[], months: number = 12): MonthlyData[] {
-  const now = new Date()
-  const result: MonthlyData[] = []
+function formatDayLabel(date: Date): string {
+  return `${date.getUTCDate()} ${UA_MONTHS[date.getUTCMonth()].toLowerCase()}`
+}
 
-  // Build month list going back `months` from current
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    result.push({
-      month: formatMonthLabel(d.getFullYear(), d.getMonth()),
-      monthKey: formatMonthKey(d.getFullYear(), d.getMonth()),
-      income: 0,
-      expense: 0,
-      balance: 0,
-      net: 0,
-    })
+function txDate(tx: Pick<Transaction, 'date'>): Date {
+  return tx.date instanceof Date ? tx.date : new Date(tx.date)
+}
+
+function monthKeyUtc(date: Date): string {
+  return formatMonthKey(date.getUTCFullYear(), date.getUTCMonth())
+}
+
+/**
+ * The closed range a report covers. A bounded range is used as is; an open side (`allTime`, the
+ * journal's future filter) takes the first / last transaction's UTC day. Null when nothing is left
+ * to show (no transactions for an open range, or an empty range).
+ */
+function reportRange(range: PeriodRange, transactions: Transaction[]): { start: Date; end: Date } | null {
+  let { start, end } = range
+  if (!start || !end) {
+    let min = Infinity
+    let max = -Infinity
+    for (const tx of transactions) {
+      const t = txDate(tx).getTime()
+      if (t < min) min = t
+      if (t > max) max = t
+    }
+    if (min === Infinity) return null
+    start ??= startOfDayUtc(new Date(min))
+    end ??= endOfDayUtc(new Date(max))
+  }
+  return start.getTime() <= end.getTime() ? { start, end } : null
+}
+
+function inRange(tx: Transaction, range: { start: Date; end: Date }): boolean {
+  const t = txDate(tx).getTime()
+  return t >= range.start.getTime() && t <= range.end.getTime()
+}
+
+/** The UTC months a range touches, oldest first. */
+function monthsOf(range: { start: Date; end: Date }): YearMonth[] {
+  const last: YearMonth = { year: range.end.getUTCFullYear(), month: range.end.getUTCMonth() }
+  const months: YearMonth[] = []
+  for (
+    let ym: YearMonth = { year: range.start.getUTCFullYear(), month: range.start.getUTCMonth() };
+    ym.year < last.year || (ym.year === last.year && ym.month <= last.month);
+    ym = shiftMonth(ym, 1)
+  ) {
+    months.push(ym)
+  }
+  return months
+}
+
+/** Number of UTC calendar days of a range (both ends included). */
+function daysOf(range: { start: Date; end: Date }): number {
+  return Math.round((startOfDayUtc(range.end).getTime() - startOfDayUtc(range.start).getTime()) / DAY_MS) + 1
+}
+
+/**
+ * Cash Flow over a resolved period (`resolvePeriod`): transactions outside the range are left
+ * out; buckets are UTC months when the range is longer than 31 days and UTC days otherwise.
+ * Transfers do not count. `balance` is the running total of `net` from the start of the range.
+ */
+export function buildCashFlow(transactions: Transaction[], range: PeriodRange): CashFlowReport {
+  const bounded = reportRange(range, transactions)
+  if (!bounded) return { granularity: 'month', buckets: [] }
+
+  const granularity: CashFlowGranularity =
+    daysOf(bounded) > CASHFLOW_DAY_BUCKETS_MAX_DAYS ? 'month' : 'day'
+  const buckets: CashFlowBucket[] = []
+  const empty = { income: 0, expense: 0, balance: 0, net: 0 }
+
+  if (granularity === 'month') {
+    for (const { year, month } of monthsOf(bounded)) {
+      buckets.push({ label: formatMonthLabel(year, month), key: formatMonthKey(year, month), ...empty })
+    }
+  } else {
+    for (let d = startOfDayUtc(bounded.start); d.getTime() <= bounded.end.getTime(); d = addDaysUtc(d, 1)) {
+      buckets.push({ label: formatDayLabel(d), key: dayKeyUtc(d), ...empty })
+    }
   }
 
-  // Aggregate transactions into months
+  const byKey = new Map(buckets.map((b) => [b.key, b]))
+  const keyOf = granularity === 'month' ? monthKeyUtc : dayKeyUtc
   for (const tx of transactions) {
-    const date = tx.date instanceof Date ? tx.date : new Date(tx.date)
-    const key = formatMonthKey(date.getFullYear(), date.getMonth())
-    const entry = result.find(r => r.monthKey === key)
+    if (!inRange(tx, bounded)) continue
+    const entry = byKey.get(keyOf(txDate(tx)))
     if (!entry) continue
     if (tx.type === 'income') entry.income += tx.amount
     else if (tx.type === 'expense') entry.expense += tx.amount
   }
 
-  // Calculate net and running balance
+  // Net and the running balance
   let runningBalance = 0
-  for (const entry of result) {
+  for (const entry of buckets) {
     entry.net = entry.income - entry.expense
     runningBalance += entry.net
     entry.balance = runningBalance
   }
 
-  return result
+  return { granularity, buckets }
 }
 
+/**
+ * P&L over a resolved period: income and expense by category for the transactions inside the
+ * range, split by the UTC months the range touches (the table's columns) with a total per row.
+ * Transfers do not count; transactions without a known category go to «Без категорії».
+ */
 export function buildPL(
   transactions: Transaction[],
   categories: Category[],
-  months: number = 6
-): PLRow[] {
-  const now = new Date()
-  const monthKeys: string[] = []
-
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    monthKeys.push(formatMonthKey(d.getFullYear(), d.getMonth()))
-  }
+  range: PeriodRange
+): PLReport {
+  const bounded = reportRange(range, transactions)
+  if (!bounded) return { monthKeys: [], rows: [] }
+  const monthKeys = monthsOf(bounded).map(({ year, month }) => formatMonthKey(year, month))
 
   const rowMap = new Map<string, PLRow>()
 
@@ -126,9 +218,8 @@ export function buildPL(
   // Aggregate
   for (const tx of transactions) {
     if (tx.type === 'transfer') continue
-    const date = tx.date instanceof Date ? tx.date : new Date(tx.date)
-    const key = formatMonthKey(date.getFullYear(), date.getMonth())
-    if (!monthKeys.includes(key)) continue
+    if (!inRange(tx, bounded)) continue
+    const key = monthKeyUtc(txDate(tx))
 
     if (tx.categoryId && rowMap.has(tx.categoryId)) {
       const row = rowMap.get(tx.categoryId)!
@@ -147,7 +238,7 @@ export function buildPL(
   if (uncatIncome.total > 0) rows.push(uncatIncome)
   if (uncatExpense.total > 0) rows.push(uncatExpense)
 
-  return rows
+  return { monthKeys, rows }
 }
 
 export function buildCalendar(

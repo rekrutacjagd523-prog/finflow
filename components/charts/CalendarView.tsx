@@ -4,12 +4,18 @@ import { useState } from 'react'
 import { Transaction } from '@/types'
 import { buildCalendar, DayData } from '@/lib/utils/analytics'
 import { ChevronLeft, ChevronRight, ChevronRight as ExpandIcon } from 'lucide-react'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { formatCurrency } from '@/lib/utils/currency'
+import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface CalendarViewProps {
   transactions: Transaction[]
   year: number
   month: number
   onNavigate: (dir: 'prev' | 'next') => void
+  /** The company currency, used for the day and month totals. */
+  currency: string
   loading?: boolean
 }
 
@@ -20,13 +26,6 @@ const UA_MONTHS_FULL = [
 
 const UA_WEEKDAYS = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
 
-function formatNum(n: number): string {
-  return new Intl.NumberFormat('uk-UA', {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  }).format(n)
-}
-
 function getDayOfWeek(year: number, month: number, day: number): string {
   return UA_WEEKDAYS[new Date(year, month, day).getDay()]
 }
@@ -35,7 +34,7 @@ function Skeleton() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="h-14 rounded-xl bg-[#f9fafb] animate-pulse" />
+        <div key={i} className="h-14 rounded-xl bg-canvas animate-pulse" />
       ))}
     </div>
   )
@@ -47,9 +46,10 @@ interface DayRowProps {
   year: number
   month: number
   transactions: Transaction[]
+  currency: string
 }
 
-function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
+function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProps) {
   const [expanded, setExpanded] = useState(false)
 
   const dayTxs = transactions.filter((tx) => {
@@ -69,67 +69,67 @@ function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
     <>
       <div
         className={[
-          'flex items-center gap-3 px-4 py-3 border-b border-[#e5e7eb] transition-colors',
-          day.hasTransactions ? 'cursor-pointer hover:bg-[#f9fafb]' : '',
-          isToday ? 'bg-[#f0fdf9]' : '',
+          'flex items-center gap-3 px-4 py-3 border-b border-line transition-colors',
+          day.hasTransactions ? 'cursor-pointer hover:bg-canvas' : '',
+          isToday ? 'bg-brand-soft' : '',
         ].join(' ')}
         onClick={() => day.hasTransactions && setExpanded((v) => !v)}
       >
         {/* Day label */}
         <div className="flex items-center gap-1.5 w-14 shrink-0">
-          <span className={`text-xs font-medium ${isWeekend ? 'text-[#ef4444]' : 'text-[#6b7280]'}`}>
+          <span className={`text-xs font-medium ${isWeekend ? 'text-expense' : 'text-ink-muted'}`}>
             {dow}
           </span>
-          <span className="text-sm font-semibold text-[#111111]" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <span className="text-sm font-semibold text-ink" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {String(dayNum).padStart(2, '0')}
           </span>
         </div>
 
         {/* Dots separator */}
-        <div className="flex-1 border-b border-dotted border-[#d1d5db] self-center" />
+        <div className="flex-1 border-b border-dotted border-line self-center" />
 
         {/* Amounts */}
         <div className="flex items-center gap-4 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
           {day.income > 0 ? (
-            <span className="text-sm font-medium text-[#22c55e] min-w-[90px] text-right">
-              +{formatNum(day.income)} €
+            <span className="text-sm font-medium text-income min-w-[90px] text-right">
+              +{formatCurrency(day.income, currency)}
             </span>
           ) : (
             <span className="min-w-[90px]" />
           )}
           {day.expense > 0 ? (
-            <span className="text-sm font-medium text-[#ef4444] min-w-[90px] text-right">
-              -{formatNum(day.expense)} €
+            <span className="text-sm font-medium text-expense min-w-[90px] text-right">
+              -{formatCurrency(day.expense, currency)}
             </span>
           ) : (
             <span className="min-w-[90px]" />
           )}
           <span
             className="text-sm min-w-[90px] text-right"
-            style={{ color: day.balance >= 0 ? '#6b7280' : '#ef4444' }}
+            style={{ color: day.balance >= 0 ? TOKEN_COLORS.inkMuted : TOKEN_COLORS.expense }}
           >
-            {formatNum(day.balance)} €
+            {formatCurrency(day.balance, currency)}
           </span>
         </div>
 
         {/* Expand arrow */}
         {day.hasTransactions && (
           <ExpandIcon
-            className={`w-4 h-4 text-[#6b7280] transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+            className={`w-4 h-4 text-ink-muted transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
           />
         )}
       </div>
 
       {/* Accordion: transactions for this day */}
       {expanded && dayTxs.length > 0 && (
-        <div className="bg-[#f9fafb] border-b border-[#e5e7eb]">
+        <div className="bg-canvas border-b border-line">
           {dayTxs.map((tx) => (
             <div
               key={tx.id}
-              className="flex items-center justify-between px-8 py-2 text-sm border-b border-[#f3f4f6] last:border-0"
+              className="flex items-center justify-between px-8 py-2 text-sm border-b border-line last:border-0"
             >
               <div className="flex flex-col">
-                <span className="text-[#111111]">
+                <span className="text-ink">
                   {tx.description || (tx.type === 'income' ? 'Дохід' : tx.type === 'expense' ? 'Витрата' : 'Переказ')}
                 </span>
               </div>
@@ -137,11 +137,11 @@ function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
                 className="font-medium"
                 style={{
                   fontVariantNumeric: 'tabular-nums',
-                  color: tx.type === 'income' ? '#22c55e' : tx.type === 'expense' ? '#ef4444' : '#6366f1',
+                  color: tx.type === 'income' ? TOKEN_COLORS.income : tx.type === 'expense' ? TOKEN_COLORS.expense : TOKEN_COLORS.inkMuted,
                 }}
               >
                 {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                {formatNum(tx.amount)} {tx.currency}
+                {formatCurrency(tx.amount, tx.currency)}
               </span>
             </div>
           ))}
@@ -151,7 +151,8 @@ function DayRow({ day, dayNum, year, month, transactions }: DayRowProps) {
   )
 }
 
-export default function CalendarView({ transactions, year, month, onNavigate, loading }: CalendarViewProps) {
+export default function CalendarView({ transactions, year, month, onNavigate, currency, loading }: CalendarViewProps) {
+  const { orgSlug } = useParams<{ orgSlug: string }>()
   const days = buildCalendar(transactions, year, month)
   const totalIncome = days.reduce((s, d) => s + d.income, 0)
   const totalExpense = days.reduce((s, d) => s + d.expense, 0)
@@ -162,29 +163,29 @@ export default function CalendarView({ transactions, year, month, onNavigate, lo
       <div className="flex items-center justify-between">
         <button
           onClick={() => onNavigate('prev')}
-          className="p-2 rounded-lg hover:bg-[#f9fafb] transition-colors text-[#6b7280] hover:text-[#111111]"
+          className="p-2 rounded-lg hover:bg-canvas transition-colors text-ink-muted hover:text-ink"
           aria-label="Попередній місяць"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
         <div className="flex flex-col items-center gap-0.5">
-          <h3 className="text-base font-semibold text-[#111111]">
+          <h3 className="text-base font-semibold text-ink">
             {UA_MONTHS_FULL[month]} {year}
           </h3>
           <div className="flex gap-3 text-xs" style={{ fontVariantNumeric: 'tabular-nums' }}>
             {totalIncome > 0 && (
-              <span className="text-[#22c55e]">+{formatNum(totalIncome)} €</span>
+              <span className="text-income">+{formatCurrency(totalIncome, currency)}</span>
             )}
             {totalExpense > 0 && (
-              <span className="text-[#ef4444]">-{formatNum(totalExpense)} €</span>
+              <span className="text-expense">-{formatCurrency(totalExpense, currency)}</span>
             )}
           </div>
         </div>
 
         <button
           onClick={() => onNavigate('next')}
-          className="p-2 rounded-lg hover:bg-[#f9fafb] transition-colors text-[#6b7280] hover:text-[#111111]"
+          className="p-2 rounded-lg hover:bg-canvas transition-colors text-ink-muted hover:text-ink"
           aria-label="Наступний місяць"
         >
           <ChevronRight className="w-5 h-5" />
@@ -194,21 +195,21 @@ export default function CalendarView({ transactions, year, month, onNavigate, lo
       {loading ? (
         <Skeleton />
       ) : days.every(d => !d.hasTransactions) ? (
-        <div className="rounded-xl border border-[#e5e7eb] flex flex-col items-center justify-center gap-2 py-16">
-          <p className="text-[#6b7280]">Немає транзакцій за цей місяць</p>
-          <a href="/transactions" className="text-[#00c896] text-sm underline underline-offset-2">
+        <div className="rounded-xl border border-line flex flex-col items-center justify-center gap-2 py-16">
+          <p className="text-ink-muted">Немає транзакцій за цей місяць</p>
+          <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
             Додати транзакції →
-          </a>
+          </Link>
         </div>
       ) : (
-        <div className="rounded-xl border border-[#e5e7eb] overflow-hidden bg-white">
+        <div className="rounded-xl border border-line overflow-hidden bg-white">
           {/* Column headers */}
-          <div className="flex items-center gap-3 px-4 py-2 bg-[#f9fafb] border-b border-[#e5e7eb] text-xs text-[#6b7280] font-semibold uppercase tracking-wide">
+          <div className="flex items-center gap-3 px-4 py-2 bg-canvas border-b border-line text-xs text-ink-muted font-semibold uppercase tracking-wide">
             <div className="w-14 shrink-0">День</div>
             <div className="flex-1" />
             <div className="flex items-center gap-4 shrink-0" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              <span className="min-w-[90px] text-right text-[#22c55e]">Дохід</span>
-              <span className="min-w-[90px] text-right text-[#ef4444]">Витрата</span>
+              <span className="min-w-[90px] text-right text-income">Дохід</span>
+              <span className="min-w-[90px] text-right text-expense">Витрата</span>
               <span className="min-w-[90px] text-right">Баланс</span>
             </div>
             <div className="w-4" />
@@ -221,6 +222,7 @@ export default function CalendarView({ transactions, year, month, onNavigate, lo
               year={year}
               month={month}
               transactions={transactions}
+              currency={currency}
             />
           ))}
         </div>

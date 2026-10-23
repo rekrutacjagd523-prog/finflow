@@ -157,7 +157,7 @@ export default function EnableBankingConnect({ orgId }: Props) {
         </div>
       ))}
 
-      <Button variant="outline" className="rounded-[8px] border-[#00c896] text-[#00c896] hover:bg-[#00c896]/5"
+      <Button variant="outline" className="rounded-[8px] border-[#00c896] text-brand-soft-foreground hover:bg-[#00c896]/5"
         onClick={handleShowPicker} disabled={loading || connecting}>
         {showPicker ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
         {connecting ? 'Перенаправлення...' : loading ? 'Завантаження...' : 'Підключити банк'}
@@ -168,7 +168,7 @@ export default function EnableBankingConnect({ orgId }: Props) {
           <div className="flex gap-2 flex-wrap">
             {COUNTRIES.map(c => (
               <button key={c.code} onClick={() => handleCountryChange(c.code)}
-                className={`text-xs px-2.5 py-1 rounded-full border transition-all ${country === c.code ? 'bg-[#00c896] text-white border-[#00c896]' : 'border-[#e5e7eb] text-[#6b7280] hover:border-[#00c896]'}`}>
+                className={`text-xs px-2.5 py-1 rounded-full border transition-all ${country === c.code ? 'bg-[#00c896] text-ink border-[#00c896]' : 'border-[#e5e7eb] text-[#6b7280] hover:border-[#00c896]'}`}>
                 {c.name}
               </button>
             ))}

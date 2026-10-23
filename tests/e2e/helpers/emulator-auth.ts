@@ -56,3 +56,17 @@ export async function createEmulatorUser(
   }
   return { email, idToken }
 }
+
+/** Signs an existing Auth-emulator user in over REST; returns the uid and a fresh ID token. */
+export async function signInEmulatorUser(
+  request: APIRequestContext,
+  email: string,
+  password: string,
+): Promise<{ uid: string; idToken: string }> {
+  const res = await request.post(identityToolkit('accounts:signInWithPassword'), {
+    data: { email, password, returnSecureToken: true },
+  })
+  await ok(res, 'signInWithPassword')
+  const { localId, idToken } = (await res.json()) as { localId: string; idToken: string }
+  return { uid: localId, idToken }
+}

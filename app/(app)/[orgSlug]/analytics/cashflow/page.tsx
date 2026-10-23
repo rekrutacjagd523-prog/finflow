@@ -2,18 +2,14 @@
 
 import { useState, useMemo } from 'react'
 import { useTransactions } from '@/lib/hooks/useTransactions'
-import { buildCashFlow, MonthlyData } from '@/lib/utils/analytics'
+import { buildCashFlow } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
+import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
+import { cn } from '@/lib/utils'
 import CashFlowChart from '@/components/charts/CashFlowChart'
-import { Download, ArrowLeft } from 'lucide-react'
+import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-
-const PERIODS = [
-  { label: '3М', value: 3 },
-  { label: '6М', value: 6 },
-  { label: '12М', value: 12 },
-]
 
 function formatNum(n: number): string {
   return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(n)
@@ -24,66 +20,39 @@ export default function CashFlowPage() {
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
   const { transactions, loading } = useTransactions(orgId)
-  const [period, setPeriod] = useState(12)
+  const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
+  // The browser clock, read once per visit (presets resolve against it).
+  const [now] = useState(() => new Date())
 
-  const data: MonthlyData[] = useMemo(
-    () => buildCashFlow(transactions, period),
-    [transactions, period]
+  const { granularity, buckets: data } = useMemo(
+    () => buildCashFlow(transactions, resolvePeriod(period, now)),
+    [transactions, period, now]
   )
+  const unitLabel = granularity === 'month' ? 'Місяць' : 'День'
 
   const handleExport = () => {
     exportToCSV(
       data.map((row) => ({
-        Місяць: row.month,
+        [unitLabel]: row.label,
         Дохід: row.income,
         Витрата: row.expense,
         Різниця: row.net,
         Баланс: row.balance,
       })),
-      `cashflow-${period}m`
+      `cashflow-${periodSlug(period)}`
     )
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb] p-6 md:p-10">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/${orgSlug}/analytics`}
-            className="p-2 rounded-lg hover:bg-white transition-colors text-[#6b7280] hover:text-[#111111]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-[#111111]">Cash Flow</h1>
-            <p className="text-sm text-[#6b7280]">Рух коштів по місяцях</p>
+    // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
+    <div className="space-y-6">
+        {/* Header and the report toolbar (period first, then the actions), as in Finmap */}
+        <div className="space-y-4">
+          <div>
+            <h1 className="font-display text-xl font-semibold text-ink">Cash Flow</h1>
+            <p className="text-sm text-ink-muted">Рух коштів за обраний період</p>
           </div>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e5e7eb] bg-white text-sm text-[#111111] hover:bg-[#f9fafb] transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Експорт CSV
-          </button>
-        </div>
-
-        {/* Period selector */}
-        <div className="flex gap-2">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={[
-                'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                period === p.value
-                  ? 'bg-[#00c896] text-white'
-                  : 'bg-white border border-[#e5e7eb] text-[#6b7280] hover:text-[#111111]',
-              ].join(' ')}
-            >
-              {p.label}
-            </button>
-          ))}
+          <ReportToolbar period={period} onPeriodChange={setPeriod} onExport={handleExport} />
         </div>
 
         {/* Summary cards */}
@@ -92,15 +61,15 @@ export default function CashFlowPage() {
           const totalExpense = data.reduce((s, d) => s + d.expense, 0)
           const net = totalIncome - totalExpense
           return (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
-                { label: 'Доходи', value: totalIncome, color: '#22c55e', bg: '#f0fdf4' },
-                { label: 'Витрати', value: totalExpense, color: '#ef4444', bg: '#fef2f2' },
-                { label: 'Різниця', value: net, color: net >= 0 ? '#22c55e' : '#ef4444', bg: net >= 0 ? '#f0fdf4' : '#fef2f2' },
+                { id: 'income', label: 'Доходи', value: totalIncome, tone: 'text-income' },
+                { id: 'expense', label: 'Витрати', value: totalExpense, tone: 'text-expense' },
+                { id: 'net', label: 'Різниця', value: net, tone: net >= 0 ? 'text-income' : 'text-expense' },
               ].map((card) => (
-                <div key={card.label} className="bg-white rounded-2xl border border-[#e5e7eb] px-5 py-4">
-                  <p className="text-xs text-[#6b7280] mb-1">{card.label}</p>
-                  <p className="text-xl font-bold tabular-nums" style={{ color: card.color }}>
+                <div key={card.label} className="rounded-panel border border-line bg-surface px-5 py-4">
+                  <p className="mb-1 text-xs text-ink-muted">{card.label}</p>
+                  <p data-testid={`cashflow-total-${card.id}`} className={cn('text-xl font-bold tabular-nums', card.tone)}>
                     {card.value >= 0 && card.label === 'Різниця' ? '+' : ''}{formatNum(card.value)}
                   </p>
                 </div>
@@ -110,65 +79,65 @@ export default function CashFlowPage() {
         })()}
 
         {/* Chart */}
-        <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6">
+        <div className="rounded-panel border border-line bg-surface p-4 lg:p-6">
           <CashFlowChart data={data} loading={loading} />
         </div>
 
         {/* Detail table */}
-        <div className="bg-white rounded-2xl border border-[#e5e7eb] overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#e5e7eb]">
-            <h2 className="text-sm font-semibold text-[#111111]">Деталізація по місяцях</h2>
+        <div className="overflow-hidden rounded-panel border border-line bg-surface">
+          <div className="border-b border-line px-6 py-4">
+            <h2 className="text-sm font-semibold text-ink">
+              {granularity === 'month' ? 'Деталізація по місяцях' : 'Деталізація по днях'}
+            </h2>
           </div>
           {loading ? (
-            <div className="p-6 space-y-3">
+            <div className="space-y-3 p-6">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-10 bg-[#f9fafb] rounded-lg animate-pulse" />
+                <div key={i} className="h-10 animate-pulse rounded-control bg-canvas" />
               ))}
             </div>
           ) : data.length === 0 ? (
-            <div className="p-6 text-center text-[#6b7280] text-sm">
+            <div className="p-6 text-center text-sm text-ink-muted">
               Немає даних за цей період.{' '}
-              <Link href="/transactions" className="text-[#00c896] underline">
+              <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground underline">
                 Додати транзакції →
               </Link>
             </div>
           ) : (
-            <table className="w-full text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
-              <thead>
-                <tr className="bg-[#f9fafb] text-[#6b7280] text-xs uppercase tracking-wide">
-                  <th className="px-6 py-3 text-left font-semibold">Місяць</th>
-                  <th className="px-6 py-3 text-right font-semibold">Дохід</th>
-                  <th className="px-6 py-3 text-right font-semibold">Витрата</th>
-                  <th className="px-6 py-3 text-right font-semibold">Різниця</th>
-                  <th className="px-6 py-3 text-right font-semibold">Баланс</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((row) => (
-                  <tr key={row.monthKey} className="border-t border-[#e5e7eb] hover:bg-[#f9fafb]">
-                    <td className="px-6 py-3 text-[#111111] font-medium">{row.month}</td>
-                    <td className="px-6 py-3 text-right text-[#22c55e]">
-                      {row.income > 0 ? `+${formatNum(row.income)}` : '—'}
-                    </td>
-                    <td className="px-6 py-3 text-right text-[#ef4444]">
-                      {row.expense > 0 ? `−${formatNum(row.expense)}` : '—'}
-                    </td>
-                    <td
-                      className="px-6 py-3 text-right font-medium"
-                      style={{ color: row.net >= 0 ? '#22c55e' : '#ef4444' }}
-                    >
-                      {row.net >= 0 ? '+' : ''}{formatNum(row.net)}
-                    </td>
-                    <td className="px-6 py-3 text-right font-semibold text-[#111111]">
-                      {formatNum(row.balance)}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm tabular-nums">
+                <thead>
+                  <tr className="bg-canvas text-xs uppercase tracking-wide text-ink-muted">
+                    <th className="px-6 py-3 text-left font-semibold">{unitLabel}</th>
+                    <th className="px-6 py-3 text-right font-semibold">Дохід</th>
+                    <th className="px-6 py-3 text-right font-semibold">Витрата</th>
+                    <th className="px-6 py-3 text-right font-semibold">Різниця</th>
+                    <th className="px-6 py-3 text-right font-semibold">Баланс</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.map((row) => (
+                    <tr key={row.key} className="border-t border-line hover:bg-canvas">
+                      <td className="px-6 py-3 font-medium text-ink">{row.label}</td>
+                      <td className="px-6 py-3 text-right text-income">
+                        {row.income > 0 ? `+${formatNum(row.income)}` : '—'}
+                      </td>
+                      <td className="px-6 py-3 text-right text-expense">
+                        {row.expense > 0 ? `−${formatNum(row.expense)}` : '—'}
+                      </td>
+                      <td className={cn('px-6 py-3 text-right font-medium', row.net >= 0 ? 'text-income' : 'text-expense')}>
+                        {row.net >= 0 ? '+' : ''}{formatNum(row.net)}
+                      </td>
+                      <td className="px-6 py-3 text-right font-semibold text-ink">
+                        {formatNum(row.balance)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
-      </div>
-    </main>
+    </div>
   )
 }

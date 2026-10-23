@@ -2,13 +2,16 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { PLRow } from '@/lib/utils/analytics'
+import { TOKEN_COLORS } from '@/lib/ui/colors'
+import { cn } from '@/lib/utils'
 
 interface Props {
   rows: PLRow[]
 }
 
-const COLORS_INCOME = ['#22c55e', '#16a34a', '#4ade80', '#86efac', '#bbf7d0', '#00c896']
-const COLORS_EXPENSE = ['#ef4444', '#dc2626', '#f87171', '#fca5a5', '#f97316', '#fb923c']
+// Slice palettes: the income/expense token first, then lighter shades of the same hue.
+const COLORS_INCOME = [TOKEN_COLORS.income, '#16a34a', '#4ade80', '#86efac', '#bbf7d0', TOKEN_COLORS.brand]
+const COLORS_EXPENSE = [TOKEN_COLORS.expense, '#f87171', '#fca5a5', '#f97316', '#fb923c', '#fecaca']
 
 function formatNum(n: number): string {
   return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(n)
@@ -19,10 +22,10 @@ function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null
   const item = payload[0]
   return (
-    <div className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 shadow text-sm">
-      <p className="font-medium text-[#111111]">{item.name}</p>
-      <p className="text-[#6b7280]">{formatNum(item.value)}</p>
-      <p className="text-[#9ca3af] text-xs">{item.payload.percent}%</p>
+    <div className="rounded-lg border border-line bg-surface px-3 py-2 shadow-pop text-sm">
+      <p className="font-medium text-ink">{item.name}</p>
+      <p className="text-ink-muted">{formatNum(item.value)}</p>
+      <p className="text-ink-subtle text-xs">{item.payload.percent}%</p>
     </div>
   )
 }
@@ -32,13 +35,14 @@ function SummaryPie({
   total,
   rows,
   colors,
-  color,
+  toneClassName,
 }: {
   title: string
   total: number
   rows: PLRow[]
-  colors: string[]
-  color: string
+  colors: readonly string[]
+  /** Text colour utility of the total (`text-income` / `text-expense`). */
+  toneClassName: string
 }) {
   const data = rows
     .filter((r) => r.total > 0)
@@ -51,17 +55,17 @@ function SummaryPie({
 
   if (!data.length) {
     return (
-      <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6 flex flex-col items-center justify-center h-[260px]">
-        <p className="text-[#6b7280] text-sm">{title}</p>
-        <p className="text-2xl font-bold text-[#111111] mt-2">—</p>
+      <div className="bg-surface rounded-panel border border-line p-6 flex flex-col items-center justify-center h-[260px]">
+        <p className="text-ink-muted text-sm">{title}</p>
+        <p className="text-2xl font-bold text-ink mt-2">—</p>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-[#e5e7eb] p-6">
-      <p className="text-sm text-[#6b7280] mb-1">{title}</p>
-      <p className="text-2xl font-bold tabular-nums" style={{ color }}>
+    <div className="bg-surface rounded-panel border border-line p-6">
+      <p className="text-sm text-ink-muted mb-1">{title}</p>
+      <p className={cn('text-2xl font-bold tabular-nums', toneClassName)}>
         {formatNum(total)}
       </p>
       <div className="flex items-center gap-4 mt-4">
@@ -89,8 +93,8 @@ function SummaryPie({
           {data.slice(0, 6).map((item, i) => (
             <div key={i} className="flex items-center gap-2 min-w-0">
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.fill }} />
-              <span className="text-xs text-[#6b7280] truncate flex-1">{item.name}</span>
-              <span className="text-xs font-medium text-[#111111] tabular-nums shrink-0">{item.percent}%</span>
+              <span className="text-xs text-ink-muted truncate flex-1">{item.name}</span>
+              <span className="text-xs font-medium text-ink tabular-nums shrink-0">{item.percent}%</span>
             </div>
           ))}
         </div>
@@ -110,24 +114,20 @@ export default function PLSummaryCharts({ rows }: Props) {
     <div className="space-y-4">
       {/* Profit banner */}
       <div
-        className="rounded-2xl border px-6 py-4 flex items-center justify-between"
-        style={{
-          backgroundColor: profit >= 0 ? '#f0fdf4' : '#fef2f2',
-          borderColor: profit >= 0 ? '#bbf7d0' : '#fecaca',
-        }}
+        className={cn(
+          'rounded-panel border px-6 py-4 flex items-center justify-between',
+          profit >= 0 ? 'bg-brand-soft border-brand-soft-hover' : 'bg-expense-soft border-expense-soft',
+        )}
       >
         <div>
-          <p className="text-sm text-[#6b7280]">Прибуток / Збиток за період</p>
-          <p
-            className="text-3xl font-bold tabular-nums mt-1"
-            style={{ color: profit >= 0 ? '#22c55e' : '#ef4444' }}
-          >
+          <p className="text-sm text-ink-muted">Прибуток / Збиток за період</p>
+          <p className={cn('text-3xl font-bold tabular-nums mt-1', profit >= 0 ? 'text-income' : 'text-expense')}>
             {profit >= 0 ? '+' : ''}{formatNum(profit)}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-[#9ca3af]">Рентабельність</p>
-          <p className="text-xl font-semibold mt-1" style={{ color: profit >= 0 ? '#22c55e' : '#ef4444' }}>
+          <p className="text-xs text-ink-muted">Рентабельність</p>
+          <p className={cn('text-xl font-semibold mt-1', profit >= 0 ? 'text-income' : 'text-expense')}>
             {totalIncome > 0 ? Math.round((profit / totalIncome) * 100) : 0}%
           </p>
         </div>
@@ -140,14 +140,14 @@ export default function PLSummaryCharts({ rows }: Props) {
           total={totalIncome}
           rows={incomeRows}
           colors={COLORS_INCOME}
-          color="#22c55e"
+          toneClassName="text-income"
         />
         <SummaryPie
           title="Витрати за категоріями"
           total={totalExpense}
           rows={expenseRows}
           colors={COLORS_EXPENSE}
-          color="#ef4444"
+          toneClassName="text-expense"
         />
       </div>
     </div>

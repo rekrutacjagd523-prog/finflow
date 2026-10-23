@@ -1,42 +1,43 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ReceiptText } from 'lucide-react'
+import { ReceiptText } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { LazyTransactionForm } from '@/components/forms/lazy'
+import { cn } from '@/lib/utils'
+import { ACCOUNT_TYPE_LABELS } from '@/lib/utils/accounts'
 import { formatCurrency } from '@/lib/utils/currency'
-import { formatDate } from '@/lib/utils/date'
-import { TransactionForm } from '@/components/forms/TransactionForm'
-import { deleteTransaction } from '@/lib/firebase/transactions'
+import { formatDayShortUtc, formatWeekdayShortUtc, summarizeDay } from '@/lib/utils/journal'
 import type { Transaction, Account, Category } from '@/types'
 
-const TYPE_CONFIG = {
-  income: {
-    icon: ArrowDownLeft,
-    color: '#22c55e',
-    label: 'Дохід',
-    sign: '+',
-  },
-  expense: {
-    icon: ArrowUpRight,
-    color: '#ef4444',
-    label: 'Витрата',
-    sign: '-',
-  },
-  transfer: {
-    icon: ArrowLeftRight,
-    color: '#6366f1',
-    label: 'Переказ',
-    sign: '↔',
-  },
+// Sign and colour of an amount; a transfer moves money between own accounts, so it stays neutral.
+const AMOUNT_STYLE: Record<Transaction['type'], { sign: string; className: string }> = {
+  income: { sign: '+', className: 'text-income' },
+  expense: { sign: '−', className: 'text-expense' },
+  transfer: { sign: '', className: 'text-ink-muted' },
+}
+
+// Date, Amount, Account, Category, Comment, plus the phone-only trailing Amount cell.
+// The day header spans all of them; the browser clamps it to the columns that are visible.
+const COLUMN_COUNT = 6
+
+// The amount cell exists twice (a column from `sm`, a trailing cell below it) and both read from here.
+function amountLabel(tx: Transaction): string {
+  const { sign } = AMOUNT_STYLE[tx.type]
+  return `${sign}${formatCurrency(tx.amount, tx.currency)}`
 }
 
 function formatGroupKey(key: string): string {
   const date = new Date(key + 'T12:00:00')
-  return new Intl.DateTimeFormat('uk-UA', {
+  const label = new Intl.DateTimeFormat('uk-UA', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
     weekday: 'short',
   }).format(date)
+  // Capitalise only the first letter: the CSS `capitalize` class would also uppercase the month and «р.».
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 interface TransactionListProps {
@@ -64,9 +65,9 @@ export function TransactionList({
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+      <div className="space-y-2" aria-busy="true">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-14 animate-pulse rounded-control bg-canvas" />
         ))}
       </div>
     )
@@ -76,11 +77,11 @@ export function TransactionList({
 
   if (keys.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <ReceiptText className="h-12 w-12 text-gray-200 mb-4" />
-        <p className="text-gray-500 font-medium">Транзакцій ще немає</p>
-        <p className="text-sm text-gray-400 mt-1">
-          Натисніть «+ Дохід», «- Витрата» або «↔ Переказ», щоб додати першу транзакцію
+      <div className="flex flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface py-16 text-center">
+        <ReceiptText className="mb-4 size-12 text-ink-subtle" />
+        <p className="font-medium text-ink">Операцій ще немає</p>
+        <p className="mt-1 max-w-sm text-sm text-ink-muted">
+          Натисніть «Дохід», «Витрата» або «Переказ» у шапці, щоб додати першу операцію
         </p>
       </div>
     )
@@ -88,94 +89,115 @@ export function TransactionList({
 
   return (
     <>
-      <div className="space-y-6">
-        {keys.map((dateKey) => {
-          const txs = grouped[dateKey]
-          const dayTotal = txs.reduce((sum, tx) => {
-            if (tx.type === 'income') return sum + tx.amount
-            if (tx.type === 'expense') return sum - tx.amount
-            return sum
-          }, 0)
+      {/* Flush in the white shell panel: no card of its own around the table. */}
+      <div className="-mx-4 sm:mx-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="hidden w-32 pl-4 sm:table-cell sm:pl-2">Дата</TableHead>
+              <TableHead className="hidden w-40 text-right sm:table-cell">Сума</TableHead>
+              <TableHead className="pl-4 sm:pl-6">Рахунок</TableHead>
+              <TableHead className="hidden md:table-cell">Категорія</TableHead>
+              <TableHead className="hidden pr-2 md:table-cell">Коментар</TableHead>
+              <TableHead className="pr-4 text-right sm:hidden">Сума</TableHead>
+            </TableRow>
+          </TableHeader>
+          {keys.map((dateKey) => {
+            const txs = grouped[dateKey]
+            // null for a day with several currencies: no sum is better than a wrong one.
+            const day = summarizeDay(txs)
+            // A day that nets to exactly 0 (e.g. only transfers) stays neutral, without a sign.
+            const dayStyle = !day || day.total === 0 ? AMOUNT_STYLE.transfer : day.total > 0 ? AMOUNT_STYLE.income : AMOUNT_STYLE.expense
 
-          return (
-            <div key={dateKey}>
-              {/* Date header */}
-              <div className="flex items-center justify-between mb-2 px-1">
-                <span className="text-sm font-medium text-gray-500 capitalize">
-                  {formatGroupKey(dateKey)}
-                </span>
-                <span
-                  className="text-sm font-semibold tabular-nums"
-                  style={{ color: dayTotal >= 0 ? '#22c55e' : '#ef4444' }}
-                >
-                  {dayTotal >= 0 ? '+' : ''}
-                  {formatCurrency(dayTotal, txs[0]?.currency ?? 'UAH')}
-                </span>
-              </div>
-
-              {/* Transaction rows */}
-              <div className="rounded-xl border border-gray-100 overflow-hidden">
-                {txs.map((tx, idx) => {
-                  const cfg = TYPE_CONFIG[tx.type]
-                  const Icon = cfg.icon
+            return (
+              <TableBody key={dateKey} className="[&_tr:last-child]:border-b">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead scope="rowgroup" colSpan={COLUMN_COUNT} className="h-auto px-4 pt-5 pb-2 sm:px-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-ink-muted">{formatGroupKey(dateKey)}</span>
+                      {day && (
+                        <span className={cn('text-xs font-semibold tabular-nums', dayStyle.className)}>
+                          {dayStyle.sign}
+                          {formatCurrency(Math.abs(day.total), day.currency)}
+                        </span>
+                      )}
+                    </div>
+                  </TableHead>
+                </TableRow>
+                {txs.map((tx) => {
+                  const amount = AMOUNT_STYLE[tx.type]
                   const account = accountMap[tx.accountId]
                   const toAccount =
-                    tx.type === 'transfer' && tx.counterpartyId
-                      ? accountMap[tx.counterpartyId]
-                      : null
+                    tx.type === 'transfer' && tx.counterpartyId ? accountMap[tx.counterpartyId] : null
                   const category = tx.categoryId ? categoryMap[tx.categoryId] : null
+                  const categoryName = category?.name ?? (tx.type === 'transfer' ? 'Переказ' : 'Без категорії')
+                  const accountLabel = toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')
 
                   return (
-                    <div
+                    // A click anywhere on the row edits it (mouse). Keyboard and screen readers use
+                    // the real button in the account cell: the row itself is not a Tab stop.
+                    <TableRow
                       key={tx.id}
                       onClick={() => setEditTx(tx)}
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                      style={{
-                        borderTop: idx > 0 ? '1px solid #f3f4f6' : undefined,
-                      }}
+                      className="cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft"
                     >
-                      {/* Icon */}
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: cfg.color + '18' }}
-                      >
-                        <Icon className="h-4 w-4" style={{ color: cfg.color }} />
-                      </div>
-
-                      {/* Category + account */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {category?.name ?? cfg.label}
-                        </p>
-                        <p className="text-xs text-gray-400 truncate">
-                          {tx.type === 'transfer' && toAccount
-                            ? `${account?.name ?? '—'} → ${toAccount.name}`
-                            : (account?.name ?? '—')}
-                          {tx.description && ` · ${tx.description}`}
-                        </p>
-                      </div>
-
-                      {/* Amount */}
-                      <div className="text-right shrink-0">
-                        <p
-                          className="text-sm font-semibold tabular-nums"
-                          style={{ color: cfg.color }}
+                      <TableCell className="hidden py-3.5 pl-4 tabular-nums sm:table-cell sm:pl-2">
+                        <span className="block text-ink">{formatDayShortUtc(tx.date)}</span>
+                        <span className="block text-xs text-ink-muted">{formatWeekdayShortUtc(tx.date)}</span>
+                      </TableCell>
+                      <TableCell className={cn('hidden py-3.5 text-right font-semibold tabular-nums sm:table-cell', amount.className)}>
+                        {amountLabel(tx)}
+                      </TableCell>
+                      <TableCell className="py-3.5 pl-4 text-ink sm:pl-6">
+                        {/* The account cell is the first cell visible at every width (the date is
+                            hidden on a phone), so the row's button lives here. Its name starts with
+                            the visible text and adds what tells the rows apart. */}
+                        <button
+                          type="button"
+                          aria-label={`${accountLabel}: ${amountLabel(tx)}, ${formatDayShortUtc(tx.date)}, редагувати`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setEditTx(tx)
+                          }}
+                          className="block max-w-44 truncate rounded-[4px] text-left text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground sm:max-w-56"
                         >
-                          {cfg.sign}
-                          {formatCurrency(tx.amount, tx.currency)}
-                        </p>
-                      </div>
-                    </div>
+                          {accountLabel}
+                        </button>
+                        {/* Second line: the category below md (its column is hidden there), the account type above. */}
+                        <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
+                        <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
+                          {account ? ACCOUNT_TYPE_LABELS[account.type] ?? '' : ''}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {category ? (
+                          <Badge variant="chip">
+                            <span className="size-2 rounded-full" style={{ backgroundColor: category.color }} />
+                            {category.name}
+                          </Badge>
+                        ) : tx.type === 'transfer' ? (
+                          <Badge variant="chip">Переказ</Badge>
+                        ) : (
+                          <span className="text-ink-subtle">Без категорії</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden pr-2 text-ink-muted md:table-cell">
+                        <span className="block max-w-72 truncate">{tx.description || '—'}</span>
+                      </TableCell>
+                      <TableCell className={cn('py-3.5 pr-4 text-right font-semibold tabular-nums sm:hidden', amount.className)}>
+                        {amountLabel(tx)}
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </div>
-            </div>
-          )
-        })}
+              </TableBody>
+            )
+          })}
+        </Table>
       </div>
 
       {editTx && (
-        <TransactionForm
+        <LazyTransactionForm
           orgId={orgId}
           accounts={accounts}
           incomeCategories={incomeCategories}

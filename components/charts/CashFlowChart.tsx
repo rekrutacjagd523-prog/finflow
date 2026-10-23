@@ -11,10 +11,14 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { MonthlyData } from '@/lib/utils/analytics'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import type { CashFlowBucket } from '@/lib/utils/analytics'
+import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface CashFlowChartProps {
-  data: MonthlyData[]
+  /** Months or days of the selected period (`buildCashFlow`); the x axis shows `label`. */
+  data: CashFlowBucket[]
   loading?: boolean
 }
 
@@ -44,25 +48,22 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   const net = income - expense
 
   return (
-    <div className="rounded-xl border border-[#e5e7eb] bg-white p-3 shadow-lg text-sm">
-      <p className="font-semibold text-[#111111] mb-2">{label}</p>
-      <div className="space-y-1 font-[tabular-nums]">
+    <div className="rounded-xl border border-line bg-surface p-3 shadow-pop text-sm">
+      <p className="font-semibold text-ink mb-2">{label}</p>
+      <div className="space-y-1 tabular-nums">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
-          <span className="text-[#6b7280]">Дохід:</span>
-          <span className="ml-auto font-medium text-[#22c55e]">+{formatNumber(income)}</span>
+          <span className="w-2 h-2 rounded-full bg-income" />
+          <span className="text-ink-muted">Дохід:</span>
+          <span className="ml-auto font-medium text-income">+{formatNumber(income)}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
-          <span className="text-[#6b7280]">Витрата:</span>
-          <span className="ml-auto font-medium text-[#ef4444]">−{formatNumber(expense)}</span>
+          <span className="w-2 h-2 rounded-full bg-expense" />
+          <span className="text-ink-muted">Витрата:</span>
+          <span className="ml-auto font-medium text-expense">−{formatNumber(expense)}</span>
         </div>
-        <div className="border-t border-[#e5e7eb] pt-1 mt-1 flex items-center gap-2">
-          <span className="text-[#6b7280]">Різниця:</span>
-          <span
-            className="ml-auto font-semibold"
-            style={{ color: net >= 0 ? '#22c55e' : '#ef4444' }}
-          >
+        <div className="border-t border-line pt-1 mt-1 flex items-center gap-2">
+          <span className="text-ink-muted">Різниця:</span>
+          <span className={net >= 0 ? 'ml-auto font-semibold text-income' : 'ml-auto font-semibold text-expense'}>
             {net >= 0 ? '+' : ''}{formatNumber(net)}
           </span>
         </div>
@@ -73,38 +74,41 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
 
 function ChartSkeleton() {
   return (
-    <div className="w-full h-[400px] rounded-xl bg-[#f9fafb] animate-pulse flex items-center justify-center">
-      <span className="text-[#6b7280] text-sm">Завантаження...</span>
+    <div className="w-full h-[400px] rounded-xl bg-canvas animate-pulse flex items-center justify-center">
+      <span className="text-ink-muted text-sm">Завантаження...</span>
     </div>
   )
 }
 
 export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
+  const { orgSlug } = useParams<{ orgSlug: string }>()
+
   if (loading) return <ChartSkeleton />
 
   if (!data.length) {
     return (
-      <div className="w-full h-[400px] rounded-xl border border-[#e5e7eb] flex flex-col items-center justify-center gap-2">
-        <p className="text-[#6b7280]">Немає даних за цей період</p>
-        <a href="/transactions" className="text-[#00c896] text-sm underline underline-offset-2">
+      <div className="w-full h-[400px] rounded-xl border border-line flex flex-col items-center justify-center gap-2">
+        <p className="text-ink-muted">Немає даних за цей період</p>
+        <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
           Додати транзакції →
-        </a>
+        </Link>
       </div>
     )
   }
 
+  // Recharts takes colours as props: the token values from lib/ui/colors.ts.
   return (
     <ResponsiveContainer width="100%" height={400}>
       <ComposedChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={TOKEN_COLORS.line} vertical={false} />
         <XAxis
-          dataKey="month"
-          tick={{ fontSize: 12, fill: '#6b7280' }}
+          dataKey="label"
+          tick={{ fontSize: 12, fill: TOKEN_COLORS.inkMuted }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fontSize: 12, fill: '#6b7280' }}
+          tick={{ fontSize: 12, fill: TOKEN_COLORS.inkMuted }}
           axisLine={false}
           tickLine={false}
           tickFormatter={(v) => formatNumber(v)}
@@ -112,7 +116,7 @@ export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
         />
         <Tooltip content={<CustomTooltip />} />
         <Legend
-          wrapperStyle={{ fontSize: 12, color: '#6b7280', paddingTop: 8 }}
+          wrapperStyle={{ fontSize: 12, color: TOKEN_COLORS.inkMuted, paddingTop: 8 }}
           formatter={(value) => {
             const labels: Record<string, string> = {
               income: 'Дохід',
@@ -122,15 +126,15 @@ export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
             return labels[value] ?? value
           }}
         />
-        <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={32} />
-        <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={32} />
+        <Bar dataKey="income" fill={TOKEN_COLORS.income} radius={[4, 4, 0, 0]} maxBarSize={32} />
+        <Bar dataKey="expense" fill={TOKEN_COLORS.expense} radius={[4, 4, 0, 0]} maxBarSize={32} />
         <Line
           type="monotone"
           dataKey="balance"
-          stroke="#00c896"
+          stroke={TOKEN_COLORS.ink}
           strokeWidth={2}
-          dot={{ r: 3, fill: '#00c896', strokeWidth: 0 }}
-          activeDot={{ r: 5, fill: '#00c896' }}
+          dot={{ r: 3, fill: TOKEN_COLORS.ink, strokeWidth: 0 }}
+          activeDot={{ r: 5, fill: TOKEN_COLORS.ink }}
         />
       </ComposedChart>
     </ResponsiveContainer>

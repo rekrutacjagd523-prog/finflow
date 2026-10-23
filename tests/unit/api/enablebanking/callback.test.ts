@@ -89,7 +89,7 @@ describe('GET /api/enablebanking/callback', () => {
   ])('redirects to /login (keeping the settings path) with %s, without exchanging the code', async (_label, token) => {
     const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }, token))
     expect(res.status).toBe(307)
-    expect(res.headers.get('location')).toBe('http://localhost:3000/login?redirect=%2Forg-acme%2Fsettings')
+    expect(res.headers.get('location')).toBe('http://localhost:3000/login?redirect=%2Forg-acme%2Fsettings%2Fbanks')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -107,7 +107,7 @@ describe('GET /api/enablebanking/callback', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('exchanges the code and redirects to /{orgId}/settings?eb_auth=...', async () => {
+  it('exchanges the code and redirects to /{orgId}/settings/banks?eb_auth=...', async () => {
     fetchMock.mockResolvedValueOnce(upstreamJson({ session_id: 'sess-123', accounts: [] }))
 
     const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }))
@@ -115,7 +115,7 @@ describe('GET /api/enablebanking/callback', () => {
     expect(res.status).toBe(307)
     const location = new URL(res.headers.get('location')!)
     expect(location.origin).toBe('http://localhost:3000')
-    expect(location.pathname).toBe('/org-acme/settings')
+    expect(location.pathname).toBe('/org-acme/settings/banks')
     const payload = JSON.parse(Buffer.from(location.searchParams.get('eb_auth')!, 'base64url').toString('utf8'))
     expect(payload).toEqual({ sessionId: 'sess-123' })
 
@@ -132,7 +132,7 @@ describe('GET /api/enablebanking/callback', () => {
       callbackRequest({ state: aliceState(), error: 'access_denied', error_description: 'Denied data sharing consent' }),
     )
     expect(res.status).toBe(307)
-    expect(res.headers.get('location')).toBe('http://localhost:3000/org-acme/settings?eb_error=1')
+    expect(res.headers.get('location')).toBe('http://localhost:3000/org-acme/settings/banks?eb_error=1')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -160,7 +160,7 @@ describe('GET /api/enablebanking/callback', () => {
     fetchMock.mockResolvedValueOnce(upstreamJson({ message: 'invalid code' }, 400))
     const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }))
     expect(res.status).toBe(307)
-    expect(res.headers.get('location')).toBe('http://localhost:3000/org-acme/settings?eb_error=1')
+    expect(res.headers.get('location')).toBe('http://localhost:3000/org-acme/settings/banks?eb_error=1')
   })
 
   it('returns 500 "server not configured" when EB_STATE_SECRET is empty', async () => {

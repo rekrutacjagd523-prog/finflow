@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { sendEmailVerification } from 'firebase/auth'
 import { toast } from 'sonner'
+import { MailWarning } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/lib/hooks/useAuth'
 
@@ -71,17 +72,36 @@ export default function VerifyEmailBanner() {
   }
 
   return (
+    // An inset card under the tabs; on a phone a single line with a small button.
     <div
       role="status"
       data-testid="verify-email-banner"
-      className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900"
+      className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:px-4 sm:py-3 lg:mx-8"
     >
-      <p>
-        Підтвердіть email <strong>{user.email}</strong>, щоб підключати банки. Не отримали лист?
-        Надішліть його ще раз.
+      <MailWarning className="size-4 shrink-0 text-amber-700" aria-hidden />
+      <p className="min-w-0 flex-1 truncate sm:whitespace-normal">
+        <span className="sm:hidden">Підтвердіть email, щоб підключати банки</span>
+        <span className="hidden sm:inline">
+          Підтвердіть email <strong>{user.email}</strong>, щоб підключати банки. Не отримали лист?
+          Надішліть його ще раз.
+        </span>
       </p>
-      <Button type="button" variant="outline" size="sm" onClick={handleResend} disabled={sending}>
-        {sending ? 'Надсилаємо…' : 'Надіслати лист ще раз'}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleResend}
+        disabled={sending}
+        className="shrink-0 border-amber-200 bg-surface text-amber-900 hover:bg-amber-100"
+      >
+        {sending ? (
+          'Надсилаємо…'
+        ) : (
+          <>
+            <span className="sm:hidden">Надіслати</span>
+            <span className="hidden sm:inline">Надіслати лист ще раз</span>
+          </>
+        )}
       </Button>
     </div>
   )

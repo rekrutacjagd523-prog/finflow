@@ -2,10 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Account } from '@/types'
+import { currencySymbol, formatCurrency } from '@/lib/utils/currency'
+import { TOKEN_COLORS } from '@/lib/ui/colors'
 
 interface BalanceSheetProps {
   accounts: Account[]
   orgId?: string
+  /** The company currency: every amount on the sheet is shown in it (no conversion before S04). */
+  currency: string
   loading?: boolean
 }
 
@@ -33,17 +37,20 @@ const DEFAULT_FIELDS: EditableFields = {
   loans: 0,
 }
 
-function formatNum(n: number): string {
-  return new Intl.NumberFormat('uk-UA', {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  }).format(n)
-}
-
-function EditableRow({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function EditableRow({
+  label,
+  value,
+  currency,
+  onChange,
+}: {
+  label: string
+  value: number
+  currency: string
+  onChange: (v: number) => void
+}) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-sm text-[#374151] flex-1">{label}</span>
+      <span className="text-sm text-ink flex-1">{label}</span>
       <div className="flex items-center gap-1 shrink-0">
         <input
           type="number"
@@ -52,40 +59,40 @@ function EditableRow({ label, value, onChange }: { label: string; value: number;
           value={value || ''}
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
           placeholder="0.00"
-          className="w-32 text-right text-sm px-2 py-1 rounded-md border border-[#e5e7eb] focus:outline-none focus:ring-1 focus:ring-[#00c896] focus:border-[#00c896] text-[#111111] bg-white"
+          className="w-32 text-right text-sm px-2 py-1 rounded-md border border-line focus:outline-none focus:ring-1 focus:ring-brand-soft-foreground focus:border-brand-soft-foreground text-ink bg-surface"
           style={{ fontVariantNumeric: 'tabular-nums' }}
         />
-        <span className="text-xs text-[#6b7280]">€</span>
+        <span className="text-xs text-ink-muted">{currencySymbol(currency)}</span>
       </div>
     </div>
   )
 }
 
-function ReadOnlyRow({ label, value, color }: { label: string; value: number; color?: string }) {
+function ReadOnlyRow({ label, value, currency, color }: { label: string; value: number; currency: string; color?: string }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      <span className="text-sm text-[#374151] flex-1">{label}</span>
+      <span className="text-sm text-ink flex-1">{label}</span>
       <span
         className="text-sm font-medium shrink-0"
-        style={{ fontVariantNumeric: 'tabular-nums', color: color ?? (value >= 0 ? '#111111' : '#ef4444') }}
+        style={{ fontVariantNumeric: 'tabular-nums', color: color ?? (value >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense) }}
       >
-        {formatNum(value)} €
+        {formatCurrency(value, currency)}
       </span>
     </div>
   )
 }
 
-function SectionHeader({ roman, title, total }: { roman: string; title: string; total: number }) {
+function SectionHeader({ roman, title, total, currency }: { roman: string; title: string; total: number; currency: string }) {
   return (
-    <div className="flex items-center justify-between py-2 border-t border-[#e5e7eb] mt-2">
-      <span className="text-xs font-bold text-[#6b7280] uppercase tracking-wide">
+    <div className="flex items-center justify-between py-2 border-t border-line mt-2">
+      <span className="text-xs font-bold text-ink-muted uppercase tracking-wide">
         {roman}. {title}
       </span>
       <span
         className="text-sm font-semibold"
-        style={{ fontVariantNumeric: 'tabular-nums', color: total >= 0 ? '#111111' : '#ef4444' }}
+        style={{ fontVariantNumeric: 'tabular-nums', color: total >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense }}
       >
-        {formatNum(total)} €
+        {formatCurrency(total, currency)}
       </span>
     </div>
   )
@@ -95,12 +102,12 @@ function Skeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {[0, 1].map((i) => (
-        <div key={i} className="rounded-xl border border-[#e5e7eb] p-5 space-y-4">
-          <div className="h-4 w-28 bg-[#e5e7eb] rounded animate-pulse" />
+        <div key={i} className="rounded-xl border border-line p-5 space-y-4">
+          <div className="h-4 w-28 bg-line rounded animate-pulse" />
           {Array.from({ length: 4 }).map((_, j) => (
             <div key={j} className="flex justify-between items-center gap-4">
-              <div className="h-3 flex-1 bg-[#f9fafb] rounded animate-pulse" />
-              <div className="h-3 w-24 bg-[#f9fafb] rounded animate-pulse" />
+              <div className="h-3 flex-1 bg-canvas rounded animate-pulse" />
+              <div className="h-3 w-24 bg-canvas rounded animate-pulse" />
             </div>
           ))}
         </div>
@@ -109,7 +116,7 @@ function Skeleton() {
   )
 }
 
-export default function BalanceSheet({ accounts, orgId = 'default', loading }: BalanceSheetProps) {
+export default function BalanceSheet({ accounts, orgId = 'default', currency, loading }: BalanceSheetProps) {
   const storageKey = `balance-sheet-${orgId}`
 
   const [fields, setFields] = useState<EditableFields>(DEFAULT_FIELDS)
@@ -168,95 +175,96 @@ export default function BalanceSheet({ accounts, orgId = 'default', loading }: B
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ fontVariantNumeric: 'tabular-nums' }}>
       {/* ======= ASSETS ======= */}
-      <div className="rounded-xl border border-[#e5e7eb] bg-white p-5 space-y-1">
-        <div className="flex items-center justify-between pb-3 border-b border-[#e5e7eb]">
-          <h3 className="text-sm font-bold text-[#111111] uppercase tracking-wide">Активи</h3>
-          <span className="text-sm font-bold text-[#00c896]">{formatNum(totalAssets)} €</span>
+      <div className="rounded-xl border border-line bg-surface p-5 space-y-1">
+        <div className="flex items-center justify-between pb-3 border-b border-line">
+          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">Активи</h3>
+          <span className="text-sm font-bold text-brand-soft-foreground">{formatCurrency(totalAssets, currency)}</span>
         </div>
 
         {/* I. Fixed */}
-        <SectionHeader roman="I" title="Основні засоби" total={fixedTotal} />
-        <EditableRow label="Нерухомість" value={fields.realestate} onChange={(v) => updateField('realestate', v)} />
-        <EditableRow label="Обладнання" value={fields.equipment} onChange={(v) => updateField('equipment', v)} />
-        <ReadOnlyRow label="Інвестиції (крипто)" value={cryptoTotal} />
+        <SectionHeader roman="I" title="Основні засоби" total={fixedTotal} currency={currency} />
+        <EditableRow label="Нерухомість" value={fields.realestate} currency={currency} onChange={(v) => updateField('realestate', v)} />
+        <EditableRow label="Обладнання" value={fields.equipment} currency={currency} onChange={(v) => updateField('equipment', v)} />
+        <ReadOnlyRow label="Інвестиції (крипто)" value={cryptoTotal} currency={currency} />
         {cryptoAccounts.map((acc) => (
           <div key={acc.id} className="flex items-center justify-between gap-3 pl-4 py-1">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: acc.color }} />
-              <span className="text-xs text-[#6b7280] truncate">{acc.name}</span>
+              <span className="text-xs text-ink-muted truncate">{acc.name}</span>
             </div>
-            <span className="text-xs text-[#6b7280] shrink-0">{formatNum(acc.balance)} €</span>
+            {/* A single account is shown in its own currency. */}
+            <span className="text-xs text-ink-muted shrink-0">{formatCurrency(acc.balance, acc.currency)}</span>
           </div>
         ))}
 
         {/* II. Current */}
-        <SectionHeader roman="II" title="Поточні активи" total={currentTotal} />
-        <EditableRow label="Запаси" value={fields.inventory} onChange={(v) => updateField('inventory', v)} />
-        <EditableRow label="Дебіторська заборгованість" value={fields.receivables} onChange={(v) => updateField('receivables', v)} />
+        <SectionHeader roman="II" title="Поточні активи" total={currentTotal} currency={currency} />
+        <EditableRow label="Запаси" value={fields.inventory} currency={currency} onChange={(v) => updateField('inventory', v)} />
+        <EditableRow label="Дебіторська заборгованість" value={fields.receivables} currency={currency} onChange={(v) => updateField('receivables', v)} />
 
         {/* III. Money */}
-        <SectionHeader roman="III" title="Гроші" total={moneyTotal} />
+        <SectionHeader roman="III" title="Гроші" total={moneyTotal} currency={currency} />
         {accounts.length === 0 ? (
-          <p className="text-sm text-[#6b7280] italic py-1">Немає рахунків</p>
+          <p className="text-sm text-ink-muted italic py-1">Немає рахунків</p>
         ) : (
           accounts.map((acc) => (
             <div key={acc.id} className="flex items-center justify-between gap-3 py-1">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: acc.color }} />
-                <span className="text-sm text-[#374151] truncate">{acc.name}</span>
+                <span className="text-sm text-ink truncate">{acc.name}</span>
               </div>
               <span
                 className="text-sm font-medium shrink-0"
-                style={{ color: acc.balance >= 0 ? '#111111' : '#ef4444' }}
+                style={{ color: acc.balance >= 0 ? TOKEN_COLORS.ink : TOKEN_COLORS.expense }}
               >
-                {formatNum(acc.balance)} €
+                {formatCurrency(acc.balance, acc.currency)}
               </span>
             </div>
           ))
         )}
 
         {/* Total */}
-        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-[#111111]">
-          <span className="text-base font-bold text-[#111111]">Всього активи</span>
-          <span className="text-base font-bold text-[#00c896]">{formatNum(totalAssets)} €</span>
+        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-ink">
+          <span className="text-base font-bold text-ink">Всього активи</span>
+          <span className="text-base font-bold text-brand-soft-foreground">{formatCurrency(totalAssets, currency)}</span>
         </div>
       </div>
 
       {/* ======= LIABILITIES ======= */}
-      <div className="rounded-xl border border-[#e5e7eb] bg-white p-5 space-y-1">
-        <div className="flex items-center justify-between pb-3 border-b border-[#e5e7eb]">
-          <h3 className="text-sm font-bold text-[#111111] uppercase tracking-wide">Зобов’язання</h3>
-          <span className="text-sm font-bold text-[#6366f1]">{formatNum(totalLiabilities)} €</span>
+      <div className="rounded-xl border border-line bg-surface p-5 space-y-1">
+        <div className="flex items-center justify-between pb-3 border-b border-line">
+          <h3 className="text-sm font-bold text-ink uppercase tracking-wide">Зобов’язання</h3>
+          <span className="text-sm font-bold text-ink">{formatCurrency(totalLiabilities, currency)}</span>
         </div>
 
         {/* I. Equity */}
-        <SectionHeader roman="I" title="Власний капітал" total={equityTotal} />
-        <EditableRow label="Статутний капітал" value={fields.charter_capital} onChange={(v) => updateField('charter_capital', v)} />
-        <EditableRow label="Додатковий капітал" value={fields.additional_capital} onChange={(v) => updateField('additional_capital', v)} />
-        <ReadOnlyRow label="Нерозподілений прибуток" value={retainedEarnings} color={retainedEarnings >= 0 ? '#22c55e' : '#ef4444'} />
+        <SectionHeader roman="I" title="Власний капітал" total={equityTotal} currency={currency} />
+        <EditableRow label="Статутний капітал" value={fields.charter_capital} currency={currency} onChange={(v) => updateField('charter_capital', v)} />
+        <EditableRow label="Додатковий капітал" value={fields.additional_capital} currency={currency} onChange={(v) => updateField('additional_capital', v)} />
+        <ReadOnlyRow label="Нерозподілений прибуток" value={retainedEarnings} currency={currency} color={retainedEarnings >= 0 ? TOKEN_COLORS.income : TOKEN_COLORS.expense} />
 
         {/* II. Debt */}
-        <SectionHeader roman="II" title="Позиковий капітал" total={debtTotal} />
-        <EditableRow label="Кредити" value={fields.loans} onChange={(v) => updateField('loans', v)} />
+        <SectionHeader roman="II" title="Позиковий капітал" total={debtTotal} currency={currency} />
+        <EditableRow label="Кредити" value={fields.loans} currency={currency} onChange={(v) => updateField('loans', v)} />
 
         {/* Total */}
-        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-[#111111]">
-          <span className="text-base font-bold text-[#111111]">Всього зобов’язання</span>
-          <span className="text-base font-bold text-[#6366f1]">{formatNum(totalLiabilities)} €</span>
+        <div className="flex justify-between items-center pt-3 mt-2 border-t-2 border-ink">
+          <span className="text-base font-bold text-ink">Всього зобов’язання</span>
+          <span className="text-base font-bold text-ink">{formatCurrency(totalLiabilities, currency)}</span>
         </div>
 
         {/* Balance check */}
         <div className={[
           'flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium mt-2',
           Math.abs(totalAssets - totalLiabilities) < 0.01
-            ? 'bg-[#f0fdf4] text-[#22c55e]'
-            : 'bg-[#fef2f2] text-[#ef4444]',
+            ? 'bg-brand-soft text-income'
+            : 'bg-expense-soft text-expense',
         ].join(' ')}>
           <span>Баланс</span>
           <span>
             {Math.abs(totalAssets - totalLiabilities) < 0.01
               ? "Активи = Зобов\u2019язання"
-              : `Різниця: ${formatNum(Math.abs(totalAssets - totalLiabilities))} €`}
+              : `Різниця: ${formatCurrency(Math.abs(totalAssets - totalLiabilities), currency)}`}
           </span>
         </div>
       </div>

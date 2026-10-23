@@ -2,7 +2,22 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* `dark:` applies under a dark <html>, except while the light-only app shell is on the page (S01A).
+   The `:has` selector sits alone in its rule, behind @supports: a browser without `:has` (Firefox
+   < 121, Safari < 15.4) would otherwise drop it. There the fallback still keeps `dark:` off
+   inside .app-shell; only portaled layers (dialogs, menus) may then follow the dark root. */
+@custom-variant dark {
+  @supports selector(:has(*)) {
+    &:is(.dark:not(:has(.app-shell)) *) {
+      @slot;
+    }
+  }
+  @supports not selector(:has(*)) {
+    &:is(.dark *):not(.app-shell *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -46,13 +61,28 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
-  /* Design tokens */
-  --color-brand-accent: #00c896;
-  --color-income: #22c55e;
-  --color-expense: #ef4444;
-  --color-transfer: #6366f1;
-  --color-app-sidebar: #111111;
-  --color-app-bg: #0f0f0f;
+  /* FinFlow app tokens (S01A, light only; see the .app-shell block below) */
+  --color-canvas: #f4f6f5;
+  --color-surface: #ffffff;
+  --color-line: #e3e7e5;
+  --color-ink: #17201d;
+  --color-ink-muted: #5f6b66;
+  /* Text and focus tokens meet WCAG AA: >= 4.5:1 for text on surface, >= 3:1 for focus rings. */
+  --color-ink-subtle: #6b7671;
+  --color-brand: #00c896;
+  --color-brand-hover: #00b584;
+  --color-brand-soft: #e6f9f3;
+  --color-brand-soft-hover: #d2f3e8;
+  /* Also the focus-ring colour (`outline-brand-soft-foreground`): the brand green is only 2.2:1 on white. */
+  --color-brand-soft-foreground: #007a58;
+  --color-income: #00805c;
+  --color-expense: #d02222;
+  --color-expense-soft: #fdecec;
+  --radius-control: 8px;
+  --radius-field: 10px;
+  --radius-panel: 12px;
+  --shadow-panel: 0 1px 2px 0 rgb(23 32 29 / 0.05);
+  --shadow-pop: 0 12px 32px -8px rgb(23 32 29 / 0.18);
 }
 
 :root {
@@ -80,6 +110,8 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  /* Hover shade of --primary for the default button; only the app shell sets its own. */
+  --primary-hover: var(--primary);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -122,6 +154,61 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* S01A: the signed-in app is light only. next-themes keeps `dark` on <html> (the landing
+   default), so while an .app-shell is on the page the shadcn variables are pinned to the
+   FinFlow palette. :root:has(.app-shell) repeats them because dialogs, menus and selects portal
+   to <body>, outside .app-shell. Two separate rules on purpose: a browser without `:has`
+   (Firefox < 121, Safari < 15.4) drops a whole rule whose selector list contains it, which
+   would also lose the .app-shell palette. Keep the two declaration blocks identical. */
+.app-shell {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #17201d;
+  --card: #ffffff;
+  --card-foreground: #17201d;
+  --popover: #ffffff;
+  --popover-foreground: #17201d;
+  /* Dark ink on the brand green: 7.7:1 (white on it would be 2.2:1). */
+  --primary: #00c896;
+  --primary-foreground: #17201d;
+  --primary-hover: #00b584;
+  --secondary: #f4f6f5;
+  --secondary-foreground: #17201d;
+  --muted: #f4f6f5;
+  --muted-foreground: #5f6b66;
+  --accent: #e6f9f3;
+  --accent-foreground: #007a58;
+  --destructive: #d02222;
+  --border: #e3e7e5;
+  --input: #e3e7e5;
+  --ring: #007a58;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+:root:has(.app-shell) {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #17201d;
+  --card: #ffffff;
+  --card-foreground: #17201d;
+  --popover: #ffffff;
+  --popover-foreground: #17201d;
+  --primary: #00c896;
+  --primary-foreground: #17201d;
+  --primary-hover: #00b584;
+  --secondary: #f4f6f5;
+  --secondary-foreground: #17201d;
+  --muted: #f4f6f5;
+  --muted-foreground: #5f6b66;
+  --accent: #e6f9f3;
+  --accent-foreground: #007a58;
+  --destructive: #d02222;
+  --border: #e3e7e5;
+  --input: #e3e7e5;
+  --ring: #007a58;
 }
 
 @layer base {

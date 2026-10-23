@@ -1,22 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import { useOrg } from '@/lib/hooks/useOrg'
-import { useAccounts } from '@/lib/hooks/useAccounts'
+import { NativeSelect } from '@/components/ui/native-select'
+import { useShell } from '@/lib/hooks/useShell'
 import { exportToCSV } from '@/lib/utils/export'
 import BalanceSheet from '@/components/charts/BalanceSheet'
-import { Download, ArrowLeft } from 'lucide-react'
+import { Download } from 'lucide-react'
 
 const PERIODS = ['Поточний місяць', 'Квартал', 'Рік']
 
 export default function BalancePage() {
-  const params = useParams()
-  const orgSlug = params.orgSlug as string
-  const orgId = orgSlug
-  const { org } = useOrg()
-  const { accounts, loading } = useAccounts(orgId)
+  // Org and accounts come from the shell (the URL's org, one accounts subscription).
+  const { orgId, org, accounts, accountsLoading } = useShell()
+  // Amounts are shown in the company currency, so wait for the org as well.
+  const loading = accountsLoading || !org
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0])
 
   const handleExport = () => {
@@ -32,48 +29,49 @@ export default function BalancePage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb] p-6 md:p-10">
-      <div className="max-w-5xl mx-auto space-y-6">
+    // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <Link
-            href={`/${orgSlug}/analytics`}
-            className="p-2 rounded-lg hover:bg-white transition-colors text-[#6b7280] hover:text-[#111111]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-[#111111]">Баланс</h1>
-            <p className="text-sm text-[#6b7280]">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-xl font-semibold text-ink">Баланс</h1>
+            <p className="text-sm text-ink-muted">
               Активи та капітал{org?.name ? ` · ${org.name}` : ''}
             </p>
           </div>
+          {/* Icon-only below sm so the title keeps its width; the accessible name stays the same. */}
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e5e7eb] bg-white text-sm text-[#111111] hover:bg-[#f9fafb] transition-colors"
+            aria-label="Експорт CSV"
+            className="flex shrink-0 items-center gap-2 rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink transition-colors hover:bg-canvas sm:px-4"
           >
-            <Download className="w-4 h-4" />
-            Експорт CSV
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Експорт CSV</span>
           </button>
         </div>
 
         {/* Period dropdown */}
         <div className="flex items-center gap-3">
-          <span className="text-sm text-[#6b7280]">Станом на:</span>
-          <select
+          <span className="text-sm text-ink-muted">Станом на:</span>
+          <NativeSelect
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-[#e5e7eb] bg-white text-sm text-[#111111] focus:outline-none focus:border-[#00c896]"
+            aria-label="Станом на"
+            className="border-line"
           >
             {PERIODS.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
 
         {/* Balance sheet */}
-        <BalanceSheet accounts={accounts} orgId={orgId ?? 'default'} loading={loading} />
-      </div>
-    </main>
+        <BalanceSheet
+          accounts={accounts}
+          orgId={orgId ?? 'default'}
+          currency={org?.currency ?? 'UAH'}
+          loading={loading}
+        />
+    </div>
   )
 }

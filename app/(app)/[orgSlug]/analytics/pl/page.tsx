@@ -2,46 +2,33 @@
 
 import { useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
 import { useTransactions } from '@/lib/hooks/useTransactions'
-import { useCategories } from '@/lib/hooks/useCategories'
+import { useShell } from '@/lib/hooks/useShell'
 import { buildPL } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
+import { DEFAULT_REPORT_PERIOD, periodSlug, resolvePeriod, type PeriodSelection } from '@/lib/utils/period'
 import PLTable from '@/components/charts/PLTable'
 import PLSummaryCharts from '@/components/charts/PLSummaryCharts'
-import { Download, ArrowLeft } from 'lucide-react'
-
-const PERIODS = [
-  { label: '3М', value: 3 },
-  { label: '6М', value: 6 },
-  { label: '12М', value: 12 },
-]
-
-function getMonthKeys(months: number): string[] {
-  const now = new Date()
-  return Array.from({ length: months }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-  })
-}
+import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 
 export default function PLPage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
   const { transactions, loading: txLoading } = useTransactions(orgId)
-  const { incomeCategories, expenseCategories, loading: catLoading } = useCategories(orgId)
+  // Categories come from ShellProvider (one subscription, one default-category seed per org).
+  const { incomeCategories, expenseCategories, categoriesLoading: catLoading } = useShell()
   const categories = [...incomeCategories, ...expenseCategories]
-  const [period, setPeriod] = useState(6)
+  const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
+  // The browser clock, read once per visit (presets resolve against it).
+  const [now] = useState(() => new Date())
 
   const loading = txLoading || catLoading
 
-  const rows = useMemo(
-    () => buildPL(transactions, categories, period),
-    [transactions, categories, period]
+  const { monthKeys, rows } = useMemo(
+    () => buildPL(transactions, categories, resolvePeriod(period, now)),
+    [transactions, categories, period, now]
   )
-
-  const monthKeys = useMemo(() => getMonthKeys(period), [period])
 
   const handleExport = () => {
     exportToCSV(
@@ -51,50 +38,20 @@ export default function PLPage() {
         ...Object.fromEntries(monthKeys.map((k) => [k, row.months[k] ?? 0])),
         Всього: row.total,
       })),
-      `pl-${period}m`
+      `pl-${periodSlug(period)}`
     )
   }
 
   return (
-    <main className="min-h-screen bg-[#f9fafb] p-6 md:p-10">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/${orgSlug}/analytics`}
-            className="p-2 rounded-lg hover:bg-white transition-colors text-[#6b7280] hover:text-[#111111]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-[#111111]">P&L — Прибутки та збитки</h1>
-            <p className="text-sm text-[#6b7280]">По категоріях за обраний період</p>
+    // The shared container and the reports' sub-navigation come from analytics/layout.tsx.
+    <div className="space-y-6">
+        {/* Header and the report toolbar (period first, then the actions), as in Finmap */}
+        <div className="space-y-4">
+          <div>
+            <h1 className="font-display text-xl font-semibold text-ink">P&L — Прибутки та збитки</h1>
+            <p className="text-sm text-ink-muted">По категоріях за обраний період</p>
           </div>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#e5e7eb] bg-white text-sm text-[#111111] hover:bg-[#f9fafb] transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Експорт CSV
-          </button>
-        </div>
-
-        {/* Period selector */}
-        <div className="flex gap-2">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={[
-                'px-4 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                period === p.value
-                  ? 'bg-[#00c896] text-white'
-                  : 'bg-white border border-[#e5e7eb] text-[#6b7280] hover:text-[#111111]',
-              ].join(' ')}
-            >
-              {p.label}
-            </button>
-          ))}
+          <ReportToolbar period={period} onPeriodChange={setPeriod} onExport={handleExport} />
         </div>
 
         {/* Summary + pie charts */}
@@ -102,7 +59,6 @@ export default function PLPage() {
 
         {/* Table */}
         <PLTable rows={rows} monthKeys={monthKeys} loading={loading} />
-      </div>
-    </main>
+    </div>
   )
 }
