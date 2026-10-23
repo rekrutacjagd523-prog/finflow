@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Building2, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { deleteAccount } from '@/lib/firebase/accounts'
 import { useShell } from '@/lib/hooks/useShell'
+import { isJournalPath } from '@/lib/shell/modules'
 import { settingsPath } from '@/lib/shell/settings-sections'
 import { cn } from '@/lib/utils'
 import { summarizeAccounts } from '@/lib/utils/accounts'
@@ -33,6 +35,8 @@ function rowClass(selected: boolean): string {
 }
 
 export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSidebarProps) {
+  const router = useRouter()
+  const pathname = usePathname()
   const {
     orgId,
     org,
@@ -46,10 +50,13 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
   } = useShell()
   const collapsed = variant === 'panel' && sidebarCollapsed
   // Only accounts in the company currency; other currencies are not mentioned before S04.
-  const summary = org ? summarizeAccounts(accounts, org.currency) : null
+  // Not before both the org and the accounts are loaded: an empty list would show a false 0,00.
+  const summary = org && !accountsLoading ? summarizeAccounts(accounts, org.currency) : null
 
   const choose = (accountId: string | null) => {
     selectAccount(accountId)
+    // The selection filters the journal only, so from any other page a choice leads there.
+    if (!isJournalPath(pathname, orgId)) router.push(`/${orgId}/transactions`)
     onNavigate?.()
   }
 
@@ -158,7 +165,7 @@ export function AccountsSidebar({ variant = 'panel', onNavigate }: AccountsSideb
         <button type="button" onClick={() => choose(null)} aria-pressed={selectedAccountId === null} className={rowClass(selectedAccountId === null)}>
           <span className="size-2.5 shrink-0 rounded-full bg-brand" />
           <span className="min-w-0 flex-1 truncate">Усі рахунки</span>
-          <span className="text-xs text-ink-muted tabular-nums">{accounts.length}</span>
+          {!accountsLoading && <span className="text-xs text-ink-muted tabular-nums">{accounts.length}</span>}
         </button>
 
         {accountsLoading ? (

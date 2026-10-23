@@ -28,3 +28,14 @@ export function summarizeAccounts(
   // Normalise -0 (e.g. a tiny negative remainder) so the UI never renders "-0,00".
   return { currency: companyCurrency, total: rounded === 0 ? 0 : rounded, count }
 }
+
+/**
+ * The account selection the journal may filter on: null ("all accounts") when the selected
+ * account is not among the loaded ones, e.g. it was deleted in another tab.
+ */
+export function effectiveSelection(
+  selectedId: string | null,
+  accounts: ReadonlyArray<Pick<Account, 'id'>>,
+): string | null {
+  return selectedId !== null && accounts.some((a) => a.id === selectedId) ? selectedId : null
+}

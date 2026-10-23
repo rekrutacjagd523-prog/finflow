@@ -9,12 +9,15 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { AccountForm } from '@/components/forms/AccountForm'
 import { TransactionForm } from '@/components/forms/TransactionForm'
 import { useAccounts } from '@/lib/hooks/useAccounts'
 import { useCategories } from '@/lib/hooks/useCategories'
 import { useOrg } from '@/lib/hooks/useOrg'
 import { browserLocalStorage, createCollapsedStore } from '@/lib/shell/sidebar-store'
+import { effectiveSelection } from '@/lib/utils/accounts'
 import type { Account, Category, Organization, Transaction } from '@/types'
 
 export type TransactionType = Transaction['type']
@@ -24,6 +27,8 @@ export interface ShellContextValue {
   orgId: string
   /** The loaded organization, only once it is the URL's org (null while loading or switching). */
   org: Organization | null
+  /** Switch to another company: navigates to its journal and loads it (the switcher uses this). */
+  chooseOrg: (orgId: string) => void
   accounts: Account[]
   accountsLoading: boolean
   incomeCategories: Category[]
@@ -44,10 +49,12 @@ export interface ShellContextValue {
 
 const ShellContext = createContext<ShellContextValue | null>(null)
 
-// Module level: the flag is per browser tab and survives client-side navigation between orgs.
+// Module level: the flag is per browser (persisted in localStorage, not synced live between open
+// tabs) and survives client-side navigation between orgs.
 const sidebarStore = createCollapsedStore(browserLocalStorage)
 
 export function ShellProvider({ orgId, children }: { orgId: string; children: ReactNode }) {
+  const router = useRouter()
   const { org: loadedOrg, switchOrg } = useOrg()
   // The only accounts/categories subscription of the shell: pages read these from the context
   // (a second useCategories on a fresh org would seed the default categories twice).
@@ -59,7 +66,8 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     orgId,
     accountId: null,
   })
-  const selectedAccountId = selection.orgId === orgId ? selection.accountId : null
+  // ...and to an account that still exists (it can be deleted in another tab).
+  const selectedAccountId = effectiveSelection(selection.orgId === orgId ? selection.accountId : null, accounts)
 
   // The forms mount on open and unmount on close, so every opening starts from fresh form state.
   const [transactionFormType, setTransactionFormType] = useState<TransactionType | null>(null)
@@ -76,15 +84,36 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
   // to another company, a second tab). Load the URL's org once per org id; the ref prevents a
   // loop when the user is not a member (switchOrg then keeps the old org).
   const requestedOrgId = useRef<string | null>(null)
+  // Set by chooseOrg: the company the user just picked, while the route still shows this provider's
+  // org. Without it this provider would see the newly loaded org differ from its URL org and switch
+  // back to it, so the header and the sidebar would flicker back and forth.
+  const chosenOrgId = useRef<string | null>(null)
   useEffect(() => {
+    if (chosenOrgId.current !== null) {
+      // The route reached the chosen org (nothing left to defer), otherwise a choice is in flight.
+      if (chosenOrgId.current === orgId) chosenOrgId.current = null
+      else return
+    }
     if (!loadedOrg || loadedOrg.id === orgId || requestedOrgId.current === orgId) return
     requestedOrgId.current = orgId
-    void switchOrg(orgId)
+    switchOrg(orgId).catch(() => toast.error('Не вдалося переключити компанію'))
   }, [loadedOrg, orgId, switchOrg])
+
+  const chooseOrg = (id: string) => {
+    if (id === orgId) return
+    chosenOrgId.current = id
+    requestedOrgId.current = id
+    router.push(`/${id}/transactions`)
+    switchOrg(id).catch(() => {
+      chosenOrgId.current = null
+      toast.error('Не вдалося переключити компанію')
+    })
+  }
 
   const value: ShellContextValue = {
     orgId,
     org: loadedOrg && loadedOrg.id === orgId ? loadedOrg : null,
+    chooseOrg,
     accounts,
     accountsLoading,
     incomeCategories,

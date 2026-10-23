@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { LogOut, Settings } from 'lucide-react'
 import {
   DropdownMenu,
@@ -39,7 +40,7 @@ export function ProfileMenu() {
           Налаштування
         </DropdownMenuItem>
         {/* The AuthProvider listener performs the hard redirect to /login. */}
-        <DropdownMenuItem onClick={() => void signOut()}>
+        <DropdownMenuItem onClick={() => signOut().catch(() => toast.error('Не вдалося вийти'))}>
           <LogOut />
           Вийти
         </DropdownMenuItem>

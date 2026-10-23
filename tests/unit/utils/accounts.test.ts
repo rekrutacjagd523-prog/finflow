@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { summarizeAccounts } from '@/lib/utils/accounts'
+import { effectiveSelection, summarizeAccounts } from '@/lib/utils/accounts'
 
 const account = (balance: number, currency: string) => ({ balance, currency })
 
@@ -36,5 +36,22 @@ describe('summarizeAccounts', () => {
 
   it('compares currency codes exactly', () => {
     expect(summarizeAccounts([account(5, 'pln')], 'PLN')).toEqual({ currency: 'PLN', total: 0, count: 0 })
+  })
+})
+
+describe('effectiveSelection', () => {
+  const accounts = [{ id: 'a1' }, { id: 'a2' }]
+
+  it('keeps a selection that is among the loaded accounts', () => {
+    expect(effectiveSelection('a2', accounts)).toBe('a2')
+  })
+
+  it('drops a selection whose account is gone (deleted elsewhere)', () => {
+    expect(effectiveSelection('gone', accounts)).toBeNull()
+    expect(effectiveSelection('a1', [])).toBeNull()
+  })
+
+  it('keeps "all accounts" as null', () => {
+    expect(effectiveSelection(null, accounts)).toBeNull()
   })
 })

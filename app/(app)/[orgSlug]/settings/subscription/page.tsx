@@ -2,10 +2,11 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useOrg } from '@/lib/hooks/useOrg'
+import { useShell } from '@/lib/hooks/useShell'
 
 export default function SubscriptionSettingsPage() {
-  const { org } = useOrg()
+  // The shell's org is always the URL's org (null while it loads).
+  const { org } = useShell()
 
   return (
     <Card className="ring-line">

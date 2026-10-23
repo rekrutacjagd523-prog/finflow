@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MODULE_TABS, activeModule } from '@/lib/shell/modules'
+import { MODULE_TABS, activeModule, isJournalPath } from '@/lib/shell/modules'
 
 describe('MODULE_TABS', () => {
   it('has only the shipped modules, in order', () => {
@@ -30,5 +30,23 @@ describe('activeModule', () => {
     '/analytics/org1',
   ])('%s -> null', (path) => {
     expect(activeModule(path, 'org1')).toBeNull()
+  })
+})
+
+describe('isJournalPath', () => {
+  it.each(['/org1/transactions', '/org1/transactions/'])('%s -> true', (path) => {
+    expect(isJournalPath(path, 'org1')).toBe(true)
+  })
+
+  it.each([
+    '/org1/analytics/cashflow',
+    '/org1/settings/company',
+    '/org1/transactionsx',
+    '/org1/transactions/extra',
+    '/org1',
+    '/org2/transactions',
+    '/',
+  ])('%s -> false', (path) => {
+    expect(isJournalPath(path, 'org1')).toBe(false)
   })
 })

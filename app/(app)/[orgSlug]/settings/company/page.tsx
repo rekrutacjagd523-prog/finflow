@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useOrg } from '@/lib/hooks/useOrg'
+import { useShell } from '@/lib/hooks/useShell'
 import { db } from '@/lib/firebase/firebase'
 
 const CURRENCIES = [
@@ -21,7 +22,9 @@ const CURRENCIES = [
 export default function CompanySettingsPage() {
   const params = useParams()
   const orgId = params.orgSlug as string
-  const { org, switchOrg } = useOrg()
+  // The shell's org is always the URL's org; switchOrg only refreshes it after a save.
+  const { org } = useShell()
+  const { switchOrg } = useOrg()
 
   const [name, setName] = useState('')
   const [currency, setCurrency] = useState('UAH')

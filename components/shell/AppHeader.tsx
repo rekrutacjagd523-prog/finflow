@@ -20,7 +20,8 @@ export function AppHeader() {
       >
         Fin<span className="text-brand">Flow</span>
       </Link>
-      <div className="min-w-0 flex-1 lg:flex-none">
+      {/* A flex container, so the switcher button is a shrinkable flex item and its name truncates. */}
+      <div className="flex min-w-0 flex-1 lg:flex-none">
         <OrgSwitcher />
       </div>
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">

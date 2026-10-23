@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useOrg } from '@/lib/hooks/useOrg'
-import { useAccounts } from '@/lib/hooks/useAccounts'
+import { useShell } from '@/lib/hooks/useShell'
 import { exportToCSV } from '@/lib/utils/export'
 import BalanceSheet from '@/components/charts/BalanceSheet'
 import { Download, ArrowLeft } from 'lucide-react'
@@ -14,9 +13,8 @@ const PERIODS = ['Поточний місяць', 'Квартал', 'Рік']
 export default function BalancePage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
-  const orgId = orgSlug
-  const { org } = useOrg()
-  const { accounts, loading } = useAccounts(orgId)
+  // Org and accounts come from the shell (the URL's org, one accounts subscription).
+  const { orgId, org, accounts, accountsLoading: loading } = useShell()
   const [selectedPeriod, setSelectedPeriod] = useState(PERIODS[0])
 
   const handleExport = () => {

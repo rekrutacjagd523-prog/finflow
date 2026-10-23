@@ -22,3 +22,9 @@ export function activeModule(pathname: string, orgId: string): ModuleKey | null 
   const segment = pathname.slice(prefix.length).split('/')[0]
   return MODULE_TABS.find((tab) => tab.segment === segment)?.key ?? null
 }
+
+/** True on the journal page `/<orgId>/transactions` (a trailing slash is allowed). */
+export function isJournalPath(pathname: string, orgId: string): boolean {
+  const journal = `/${orgId}/transactions`
+  return pathname === journal || pathname === `${journal}/`
+}

@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Check, ChevronDown } from 'lucide-react'
 import {
   DropdownMenu,
@@ -13,7 +12,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { getUserOrganizations } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { useOrg } from '@/lib/hooks/useOrg'
 import { useShell } from '@/lib/hooks/useShell'
 import type { Organization } from '@/types'
 
@@ -24,10 +22,9 @@ type OrgList =
 // Company switcher. The list is fetched each time the menu opens (from the event handler, not an
 // effect). Creating a company is S16.
 export function OrgSwitcher() {
-  const router = useRouter()
   const { user } = useAuth()
-  const { switchOrg } = useOrg()
-  const { orgId, org } = useShell()
+  // chooseOrg navigates and loads the org in an order that keeps the shell's "URL org wins" sync quiet.
+  const { orgId, org, chooseOrg } = useShell()
   const [list, setList] = useState<OrgList>({ status: 'idle' })
 
   const load = async () => {
@@ -38,13 +35,6 @@ export function OrgSwitcher() {
     } catch {
       setList({ status: 'error' })
     }
-  }
-
-  const choose = (id: string) => {
-    if (id === orgId) return
-    // Navigate first: ShellProvider loads the URL's org as well, so the two never fight.
-    router.push(`/${id}/transactions`)
-    void switchOrg(id)
   }
 
   return (
@@ -81,7 +71,7 @@ export function OrgSwitcher() {
           {list.status === 'error' && <DropdownMenuItem disabled>Не вдалося завантажити компанії</DropdownMenuItem>}
           {list.status === 'ready' &&
             list.orgs.map((o) => (
-              <DropdownMenuItem key={o.id} onClick={() => choose(o.id)}>
+              <DropdownMenuItem key={o.id} onClick={() => chooseOrg(o.id)}>
                 <span className="min-w-0 flex-1 truncate">{o.name}</span>
                 <span className="text-xs text-ink-muted">{o.currency}</span>
                 {o.id === orgId && <Check className="text-brand" aria-label="Поточна компанія" />}
