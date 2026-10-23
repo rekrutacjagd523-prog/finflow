@@ -8,7 +8,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useCategories } from '@/lib/hooks/useCategories'
+import { useShell } from '@/lib/hooks/useShell'
 import { createCategory } from '@/lib/firebase/categories'
 import { db } from '@/lib/firebase/firebase'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,7 @@ const CATEGORY_COLORS = [
 export default function CategoriesSettingsPage() {
   const params = useParams()
   const orgId = params.orgSlug as string
-  const { incomeCategories, expenseCategories } = useCategories(orgId)
+  const { incomeCategories, expenseCategories } = useShell()
 
   const [newCatName, setNewCatName] = useState('')
   const [newCatType, setNewCatType] = useState<'income' | 'expense'>('income')

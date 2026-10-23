@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useTransactions } from '@/lib/hooks/useTransactions'
-import { useCategories } from '@/lib/hooks/useCategories'
+import { useShell } from '@/lib/hooks/useShell'
 import { buildPL } from '@/lib/utils/analytics'
 import { exportToCSV } from '@/lib/utils/export'
 import PLTable from '@/components/charts/PLTable'
@@ -30,7 +30,7 @@ export default function PLPage() {
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
   const { transactions, loading: txLoading } = useTransactions(orgId)
-  const { incomeCategories, expenseCategories, loading: catLoading } = useCategories(orgId)
+  const { incomeCategories, expenseCategories, categoriesLoading: catLoading } = useShell()
   const categories = [...incomeCategories, ...expenseCategories]
   const [period, setPeriod] = useState(6)
 

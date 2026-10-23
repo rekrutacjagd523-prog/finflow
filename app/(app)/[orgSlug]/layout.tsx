@@ -12,6 +12,7 @@ import {
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useOrg } from '@/lib/hooks/useOrg'
 import VerifyEmailBanner from '@/components/auth/VerifyEmailBanner'
+import { ShellProvider } from '@/lib/hooks/useShell'
 
 const navItems = (orgSlug: string) => [
   {
@@ -44,6 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    <ShellProvider orgId={orgSlug}>
     <div className="flex min-h-screen">
       {/* Sidebar */}
       <aside className="w-[220px] flex-shrink-0 bg-[#111111] flex flex-col border-r border-white/5">
@@ -102,5 +104,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
     </div>
+    </ShellProvider>
   )
 }

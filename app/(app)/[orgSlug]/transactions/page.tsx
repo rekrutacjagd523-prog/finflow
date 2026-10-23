@@ -2,28 +2,30 @@
 
 import { useState } from 'react'
 import { Plus, Minus, ArrowLeftRight } from 'lucide-react'
-import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { AccountCard } from '@/components/accounts/AccountCard'
-import { AccountForm } from '@/components/forms/AccountForm'
-import { TransactionForm } from '@/components/forms/TransactionForm'
 import { TransactionFiltersBar } from '@/components/transactions/TransactionFilters'
 import { TransactionList } from '@/components/transactions/TransactionList'
-import { useAccounts } from '@/lib/hooks/useAccounts'
+import { useShell } from '@/lib/hooks/useShell'
 import { useTransactions } from '@/lib/hooks/useTransactions'
-import { useCategories } from '@/lib/hooks/useCategories'
 import type { TransactionFilters } from '@/lib/firebase/transactions'
-import type { Transaction } from '@/types'
 
+// Interim (S01A Task 4): accounts, categories, the selected account and the forms come from
+// ShellProvider. Task 6 moves the buttons into the header and the account strip into the sidebar.
 export default function TransactionsPage() {
-  const params = useParams()
-  const orgId = params.orgSlug as string
-
-  const { accounts, loading: accLoading } = useAccounts(orgId)
-  const { incomeCategories, expenseCategories } = useCategories(orgId)
+  const {
+    orgId,
+    accounts,
+    accountsLoading: accLoading,
+    incomeCategories,
+    expenseCategories,
+    selectedAccountId,
+    selectAccount,
+    openTransactionForm,
+    openAccountForm,
+  } = useShell()
 
   const [filters, setFilters] = useState<TransactionFilters>({})
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
 
   const effectiveFilters: TransactionFilters = {
     ...filters,
@@ -31,15 +33,6 @@ export default function TransactionsPage() {
   }
 
   const { grouped, loading: txLoading } = useTransactions(orgId, effectiveFilters)
-
-  const [accountFormOpen, setAccountFormOpen] = useState(false)
-  const [txFormOpen, setTxFormOpen] = useState(false)
-  const [txType, setTxType] = useState<Transaction['type']>('income')
-
-  const openTxForm = (type: Transaction['type']) => {
-    setTxType(type)
-    setTxFormOpen(true)
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -51,7 +44,7 @@ export default function TransactionsPage() {
           {/* Quick action buttons */}
           <div className="flex gap-2">
             <Button
-              onClick={() => openTxForm('income')}
+              onClick={() => openTransactionForm('income')}
               className="gap-1.5 font-medium"
               style={{ backgroundColor: '#22c55e' }}
             >
@@ -59,7 +52,7 @@ export default function TransactionsPage() {
               Дохід
             </Button>
             <Button
-              onClick={() => openTxForm('expense')}
+              onClick={() => openTransactionForm('expense')}
               className="gap-1.5 font-medium"
               style={{ backgroundColor: '#ef4444' }}
             >
@@ -67,7 +60,7 @@ export default function TransactionsPage() {
               Витрата
             </Button>
             <Button
-              onClick={() => openTxForm('transfer')}
+              onClick={() => openTransactionForm('transfer')}
               className="gap-1.5 font-medium"
               style={{ backgroundColor: '#6366f1' }}
             >
@@ -84,7 +77,7 @@ export default function TransactionsPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Рахунки</h2>
             <button
-              onClick={() => setAccountFormOpen(true)}
+              onClick={() => openAccountForm()}
               className="text-xs text-[#00c896] hover:underline font-medium"
             >
               + Додати рахунок
@@ -100,7 +93,7 @@ export default function TransactionsPage() {
           ) : accounts.length === 0 ? (
             <div className="flex items-center justify-center h-20 border-2 border-dashed border-gray-200 rounded-xl">
               <button
-                onClick={() => setAccountFormOpen(true)}
+                onClick={() => openAccountForm()}
                 className="text-sm text-gray-400 hover:text-[#00c896] transition-colors"
               >
                 + Додати перший рахунок
@@ -110,7 +103,7 @@ export default function TransactionsPage() {
             <div className="flex gap-3 overflow-x-auto pb-1">
               {/* "All" card */}
               <div
-                onClick={() => setSelectedAccountId(null)}
+                onClick={() => selectAccount(null)}
                 className="relative rounded-xl border cursor-pointer transition-all hover:shadow-md p-4 shrink-0"
                 style={{
                   minWidth: 140,
@@ -134,9 +127,7 @@ export default function TransactionsPage() {
                     orgId={orgId}
                     selected={selectedAccountId === account.id}
                     onClick={() =>
-                      setSelectedAccountId(
-                        selectedAccountId === account.id ? null : account.id
-                      )
+                      selectAccount(selectedAccountId === account.id ? null : account.id)
                     }
                   />
                 </div>
@@ -164,22 +155,6 @@ export default function TransactionsPage() {
           loading={txLoading}
         />
       </div>
-
-      {/* Modals */}
-      <AccountForm
-        orgId={orgId}
-        open={accountFormOpen}
-        onClose={() => setAccountFormOpen(false)}
-      />
-      <TransactionForm
-        orgId={orgId}
-        accounts={accounts}
-        incomeCategories={incomeCategories}
-        expenseCategories={expenseCategories}
-        defaultType={txType}
-        open={txFormOpen}
-        onClose={() => setTxFormOpen(false)}
-      />
     </div>
   )
 }
