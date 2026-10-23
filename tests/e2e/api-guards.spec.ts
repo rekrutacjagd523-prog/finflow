@@ -8,7 +8,7 @@ test.describe('API guards', () => {
     expect((await request.get('/test-login')).status()).toBe(404)
   })
 
-  test('Enable Banking routes require a bearer token (401)', async ({ request }) => {
+  test('Enable Banking routes require a session cookie (401)', async ({ request }) => {
     const session = await request.post('/api/enablebanking/session', {
       data: { aspspName: 'Bank Millennium', aspspCountry: 'PL', orgId: 'victim-org' },
     })

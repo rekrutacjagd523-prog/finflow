@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { createEmulatorUser } from './helpers/emulator-auth'
 
 // Month labels exactly as lib/utils/analytics.ts renders them: UA_MONTHS + 2-digit year.
 const UA_MONTHS = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру']
@@ -25,17 +26,19 @@ test.describe('smoke on emulators', () => {
     expect(await res.json()).toEqual({ ok: true, region: 'local', firestore: 'ok' })
   })
 
-  test('Enable Banking session from a signed-in non-member -> 403 (criterion 4)', async ({ request }) => {
-    // A real Auth-emulator user who belongs to no organization. The route runs
-    // requireOrgMember before createJwt, so it answers 403 without calling Enable Banking.
-    const signUp = await request.post(
-      `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-api-key`,
-      { data: { email: `nonmember-${Date.now()}@finflow.test`, password: 'nonmember-pass-123', returnSecureToken: true } },
-    )
-    expect(signUp.status()).toBe(200)
-    const { idToken } = (await signUp.json()) as { idToken: string }
+  test('Enable Banking session from a verified non-member -> 403 (criterion 4)', async ({ request }) => {
+    // A real Auth-emulator user with a verified email who belongs to no organization. The route
+    // runs requireVerifiedUser and requireOrgMember before createJwt, so it answers 403 without
+    // calling Enable Banking.
+    const user = await createEmulatorUser(request, { verified: true })
+    const mint = await request.post('/api/auth/session', {
+      headers: { Origin: 'http://localhost:3000' },
+      data: { idToken: user.idToken },
+    })
+    expect(mint.status()).toBe(204)
+
     const res = await request.post('/api/enablebanking/session', {
-      headers: { Authorization: `Bearer ${idToken}` },
+      headers: { Origin: 'http://localhost:3000' },
       data: { aspspName: 'Bank Millennium', aspspCountry: 'PL', orgId: 'victim-org' },
     })
     expect(res.status()).toBe(403)

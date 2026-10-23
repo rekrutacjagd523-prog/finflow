@@ -11,10 +11,10 @@ vi.mock('@/lib/enablebanking/jwt', () => ({ createJwt: vi.fn(async () => 'eb-jwt
 
 const fetchMock = vi.fn()
 
-function callbackRequest(query: Record<string, string>): Request {
+function callbackRequest(query: Record<string, string>, token: string | null = 'token-alice'): Request {
   const url = new URL('http://localhost:3000/api/enablebanking/callback')
   for (const [k, v] of Object.entries(query)) url.searchParams.set(k, v)
-  return new Request(url)
+  return new Request(url, { headers: token ? { Cookie: `__session=${token}` } : {} })
 }
 
 function aliceState(nowSec?: number): string {
@@ -71,8 +71,32 @@ describe('GET /api/enablebanking/callback', () => {
 
   it('returns 403 when the user in the state is no longer a member, before exchanging the code', async () => {
     const state = signEbState({ orgId: 'org-acme', uid: 'user-mallory' }, TEST_EB_STATE_SECRET)
-    const res = await GET(callbackRequest({ code: 'auth-code', state }))
+    const res = await GET(callbackRequest({ code: 'auth-code', state }, 'token-mallory'))
     expect(res.status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 for a forged state even without a session (state is verified first)', async () => {
+    const forged = signEbState({ orgId: 'org-acme', uid: 'user-alice' }, 'attacker-secret')
+    const res = await GET(callbackRequest({ code: 'auth-code', state: forged }, null))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'invalid state' })
+  })
+
+  it.each([
+    ['no session cookie', null],
+    ['a forged session cookie', 'token-forged'],
+  ])('redirects to /login (keeping the settings path) with %s, without exchanging the code', async (_label, token) => {
+    const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }, token))
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toBe('http://localhost:3000/login?redirect=%2Forg-acme%2Fsettings')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 403 when the session belongs to a different user than the state', async () => {
+    const res = await GET(callbackRequest({ code: 'auth-code', state: aliceState() }, 'token-mallory'))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 

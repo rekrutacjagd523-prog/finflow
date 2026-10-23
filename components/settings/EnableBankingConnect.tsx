@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ import {
   type BankConnection,
 } from '@/lib/firebase/bankConnections'
 import { ebFetch } from '@/lib/enablebanking/client'
+import { EB_PENDING_KEY, acceptEbAuth } from '@/lib/enablebanking/pending'
 
 interface Institution {
   id: string
@@ -44,6 +45,7 @@ export default function EnableBankingConnect({ orgId }: Props) {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [connecting, setConnecting] = useState(false)
+  const handledEbAuth = useRef<string | null>(null)
 
   // Subscribe to Firestore bank connections
   useEffect(() => {
@@ -51,27 +53,35 @@ export default function EnableBankingConnect({ orgId }: Props) {
     return unsub
   }, [orgId])
 
-  // Handle callback from Enable Banking OAuth
+  // Handle callback from Enable Banking OAuth. Only a connection that THIS tab started is saved
+  // (see lib/enablebanking/pending.ts); `eb_auth` is always stripped from the URL, even if rejected.
   useEffect(() => {
     const payload = searchParams.get('eb_auth')
-    if (!payload) return
-    try {
-      const { sessionId } = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
-      if (!sessionId) return
-      const pending = JSON.parse(sessionStorage.getItem('eb_pending') ?? '{}')
-      const newConn: Omit<BankConnection, 'id'> = {
-        sessionId,
-        institutionName: pending.name ?? 'Банк',
-        connectedAt: new Date().toISOString(),
-      }
-      saveBankConnection(orgId, newConn).then(() => {
-        sessionStorage.removeItem('eb_pending')
-        toast.success(`${newConn.institutionName} підключено`)
-      }).catch(() => toast.error('Помилка збереження підключення'))
-      const url = new URL(window.location.href)
-      url.searchParams.delete('eb_auth')
-      window.history.replaceState({}, '', url.toString())
-    } catch { toast.error('Помилка підключення банку') }
+    // Once per payload: a second effect run (Strict Mode, re-render before the URL update lands)
+    // would otherwise find the pending entry already consumed and report a false failure.
+    if (!payload || handledEbAuth.current === payload) return
+    handledEbAuth.current = payload
+    const url = new URL(window.location.href)
+    url.searchParams.delete('eb_auth')
+    window.history.replaceState({}, '', url.toString())
+
+    const hadPending = sessionStorage.getItem(EB_PENDING_KEY) !== null
+    const accepted = acceptEbAuth(payload, sessionStorage)
+    if (!accepted) {
+      // Deferred: on a fresh page load this effect runs before the root <Toaster> has subscribed
+      // (child effects run first), and sonner drops toasts emitted before that.
+      const message = hadPending ? 'Помилка підключення банку' : 'Підключення не підтверджено'
+      setTimeout(() => toast.error(message), 0)
+      return
+    }
+    const newConn: Omit<BankConnection, 'id'> = {
+      sessionId: accepted.sessionId,
+      institutionName: accepted.institutionName,
+      connectedAt: new Date().toISOString(),
+    }
+    saveBankConnection(orgId, newConn)
+      .then(() => toast.success(`${newConn.institutionName} підключено`))
+      .catch(() => toast.error('Помилка збереження підключення'))
   }, [searchParams, orgId])
 
   const loadInstitutions = async (c: string) => {
@@ -104,8 +114,13 @@ export default function EnableBankingConnect({ orgId }: Props) {
         body: JSON.stringify({ aspspName: inst.id, aspspCountry: inst.country, orgId }),
       })
       const data = await res.json()
+      if (res.status === 403 && data.error === 'email_not_verified') {
+        toast.error('Підтвердіть email, щоб підключити банк')
+        setConnecting(false)
+        return
+      }
       if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`)
-      sessionStorage.setItem('eb_pending', JSON.stringify({ name: inst.name, authorizationId: data.authorizationId }))
+      sessionStorage.setItem(EB_PENDING_KEY, JSON.stringify({ name: inst.name, authorizationId: data.authorizationId }))
       window.location.href = data.url
     } catch (e) {
       toast.error('Помилка: ' + (e instanceof Error ? e.message : String(e)))

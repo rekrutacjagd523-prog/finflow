@@ -1,5 +1,5 @@
 import { createJwt } from '@/lib/enablebanking/jwt'
-import { requireOrgMember, requireUserFromBearer } from '@/lib/server/auth'
+import { requireOrgMember, requireUser } from '@/lib/server/auth'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 
 export const runtime = 'nodejs'
@@ -8,10 +8,10 @@ const BASE = 'https://api.enablebanking.com'
 const ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 
 // GET /api/enablebanking/accounts?sessionId=xxx&orgId=yyy
-// Requires `Authorization: Bearer <Firebase ID token>` of a member of `orgId`.
+// Requires the session cookie of a member of `orgId`.
 export async function GET(req: Request) {
   try {
-    const { uid } = await requireUserFromBearer(req)
+    const { uid } = await requireUser(req)
 
     const params = new URL(req.url).searchParams
     const sessionId = params.get('sessionId')

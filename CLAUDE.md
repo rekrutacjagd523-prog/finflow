@@ -9,11 +9,12 @@ Roadmap: `docs/superpowers/specs/2026-10-22-finflow-roadmap.md`. Sub-project spe
 
 ## Tech Stack
 - **Framework:** Next.js 16 (App Router; Turbopack for `next dev` and `next build`), React 19.2, TypeScript 5 (strict)
-- **Proxy:** `proxy.ts` — the Next 16 name for middleware (Node.js runtime). It only checks that the `__session` cookie exists; S01 replaces it with a verified server session.
+- **Proxy:** `proxy.ts` — the Next 16 name for middleware (Node.js runtime). It gates only app pages (`/<segment>/...`, see `isAppPath` in `lib/auth/paths.ts`): it verifies the signature and expiry of the `__session` cookie (not revocation); an invalid cookie is cleared and the visitor is redirected to `/login?redirect=…`, a verification failure on our side (including Google signing-key fetch errors) answers 503 and leaves the cookie alone. `/login` and `/register` are never redirected, so a visitor with a stale cookie can always sign in again. Firestore data is protected by security rules, not by the proxy.
+- **Auth/session (S01):** after every Firebase sign-in the browser calls `POST /api/auth/session` with a fresh ID token (`auth_time` ≤ 5 min, else 401 `reauth_required`); the server mints an HttpOnly 7-day Firebase session cookie (`__session`). Sessions are absolute: there is no silent renewal. API routes call `await requireUser(req)` / `requireVerifiedUser(req)` from `lib/server/auth.ts` (revocation-checked; POST/PUT/PATCH/DELETE also need a same-origin `Origin`; `requireVerifiedUser` reads the live user record, not the cookie claim). There is no Bearer-token auth. Every route under `app/api` must call one of them or be on the allow-list (with a reason) in `tests/unit/server/route-auth-coverage.test.ts`. Sign-out calls `POST /api/auth/logout`, which revokes ALL refresh tokens of the user (every device is signed out), but only through a live, non-revoked session (a stale revoked cookie is merely cleared); the root `AuthProvider` triggers it too when the SDK has no user. The settings page accepts the bank return value `?eb_auth=` only for a connection started in this tab (`eb_pending` in sessionStorage, `lib/enablebanking/pending.ts`). Never write `__session` from client code. Shared path and `?redirect=` rules (`safeRedirectPath`) live in `lib/auth/paths.ts`.
 - **Client data:** Firebase JS SDK 12 (Auth + Firestore), used only from `lib/firebase/` and `lib/hooks/`
 - **Server data:** `firebase-admin`, used ONLY inside `lib/server/` (each file starts with `import 'server-only'`); entry point `getAdmin()` in `lib/server/firebase-admin.ts`. Firestore uses `preferRest: true` in production only (faster serverless cold start); on the emulator it uses gRPC, because REST would need Application Default Credentials
 - **UI:** shadcn/ui (`base-nova` style on `@base-ui/react`), Recharts, Tailwind CSS 4, lucide-react, next-themes, sonner
-- **Banking:** Enable Banking (AIS/PSD2) — routes `app/api/enablebanking/*`, `lib/enablebanking/jwt.ts` (server-only JWT), `lib/enablebanking/client.ts` (`ebFetch` adds the Firebase ID token for client components)
+- **Banking:** Enable Banking (AIS/PSD2) — routes `app/api/enablebanking/*`, `lib/enablebanking/jwt.ts` (server-only JWT), `lib/enablebanking/client.ts` (`ebFetch` for client components: same-origin fetch that authenticates with the session cookie; on 401 it clears the session and navigates to `/login?redirect=…`)
 - **Payments:** Stripe is NOT wired yet (`lib/stripe.ts` is unused; billing arrives in S17)
 - **Tooling:** npm, Node.js 24 (`engines.node` = `24.x`), ESLint 9 flat config (`eslint.config.mjs` + `eslint-config-next` 16), Vitest, `@firebase/rules-unit-testing`, Playwright
 
@@ -61,15 +62,17 @@ app/
   (app)/[orgSlug]/                ← signed-in app; orgSlug is the Firestore orgId
     transactions/  analytics/{cashflow,pl,balance,calendar}/  settings/
   api/health/route.ts             ← health check (firebase-admin)
+  api/auth/{session,logout}/route.ts  ← mint / revoke the session cookie
   api/enablebanking/{institutions,session,callback,accounts}/route.ts
   page.tsx (landing), pricing/, layout.tsx, globals.css, robots.ts, sitemap.ts
 components/
   ui/            ← shadcn generated files (DO NOT EDIT by hand)
-  charts/ forms/ transactions/ accounts/ settings/ landing/  ThemeToggle.tsx
+  charts/ forms/ transactions/ accounts/ settings/ landing/ auth/ (VerifyEmailBanner)  ThemeToggle.tsx
 lib/
-  firebase/      ← client SDK init (firebase.ts) + Firestore helpers — browser only
-  hooks/         ← useAuth, useOrg, useAccounts, useCategories, useTransactions
-  server/        ← server-only: firebase-admin.ts, auth.ts, http-error.ts, eb-state.ts
+  auth/          ← paths.ts: pure path and `?redirect=` rules shared by proxy.ts and the browser
+  firebase/      ← client SDK init (firebase.ts), Firestore helpers, session.ts (establish/clear the session cookie) — browser only
+  hooks/         ← useAuth (AuthProvider, single instance in the root layout), useOrg, useAccounts, useCategories, useTransactions
+  server/        ← server-only: firebase-admin.ts, auth.ts, session-cookie.ts, request-guards.ts, http-error.ts, eb-state.ts
   enablebanking/ ← jwt.ts (server-only), client.ts (ebFetch)
   utils/         ← analytics, currency, date, export (CSV)
 scripts/         ← check-server-imports.mjs (CI guard), vercel.mjs (Vercel API helper), verify-firestore-rules.mjs (black-box rules check)
@@ -96,8 +99,8 @@ docs/            ← research, specs, plans
 - Next 16: `params`, `searchParams`, `cookies()`, `headers()` are async — always `await` them (or React `use()` in client components)
 - Client Firebase calls only in `/lib/firebase/` and `/lib/hooks/` (legacy exception: `app/(app)/[orgSlug]/settings/page.tsx` still calls `updateDoc`/`deleteDoc` directly)
 - Server-side Firestore/Auth only through `getAdmin()` from `lib/server/`; route handlers that use it `export const runtime = 'nodejs'`; map errors with `HttpError` + `errorResponse()`
-- Browser → API calls that need a user send `Authorization: Bearer <Firebase ID token>` (`ebFetch`); the route calls `requireUserFromBearer()` and `requireOrgMember()`
-- Enable Banking OAuth `state` is HMAC-signed (`lib/server/eb-state.ts`, 15 min) and carries uid + orgId; the callback verifies it and re-checks membership
+- Browser → API calls that need a user rely on the `__session` cookie (`ebFetch`, same-origin); the route calls `requireUser()` / `requireVerifiedUser()` and then `requireOrgMember()`
+- Enable Banking OAuth `state` is HMAC-signed (`lib/server/eb-state.ts`, 15 min) and carries uid + orgId; the callback verifies it, requires the session uid to equal the state uid, and re-checks membership. The bank connection (`/api/enablebanking/session`) needs a verified email (`requireVerifiedUser`, 403 `email_not_verified`); verification is soft everywhere else
 - `cn()` from `lib/utils` for className merging
 - All dates: `Date` objects in code, Firestore `Timestamp` in DB
 - Currency formatting: `Intl.NumberFormat` via `formatCurrency(amount, currency)`

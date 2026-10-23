@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
+import { useOrg } from '@/lib/hooks/useOrg'
 import { createOrganization, getUserOrganizations } from '@/lib/firebase/firestore'
 
 const CURRENCIES = [
@@ -28,12 +29,27 @@ const CURRENCIES = [
 export default function RegisterPage() {
   const router = useRouter()
   const { signUp, signInGoogle } = useAuth()
+  const { switchOrg } = useOrg()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [orgName, setOrgName] = useState('')
   const [currency, setCurrency] = useState('UAH')
   const [loading, setLoading] = useState(false)
+
+  // OrgProvider's own load started when the user appeared, before a new org existed, so load the
+  // org explicitly. The account, org and session already exist at this point: if that load fails,
+  // still leave, with a full page load that rebuilds the org state from scratch.
+  const goToOrg = async (orgId: string) => {
+    const ok = await switchOrg(orgId).then(() => true, () => false)
+    if (ok) {
+      router.push(`/${orgId}/transactions`)
+    } else {
+      // Deliberately a full page load (not router.push): it must rebuild the org state.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/${orgId}/transactions`)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,8 +58,7 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { orgId } = await signUp(email, password, name, orgName, currency)
-      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Lax'
-      router.push(`/${orgId}/transactions`)
+      await goToOrg(orgId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed'
       toast.error(message)
@@ -61,13 +76,12 @@ export default function RegisterPage() {
     try {
       const { user } = await signInGoogle()
       const existingOrgs = await getUserOrganizations(user.uid)
-      document.cookie = '__session=1; path=/; max-age=86400; SameSite=Lax'
       if (existingOrgs.length > 0) {
-        router.push(`/${existingOrgs[0].id}/transactions`)
+        await goToOrg(existingOrgs[0].id)
         return
       }
       const orgId = await createOrganization(user.uid, orgName, currency)
-      router.push(`/${orgId}/transactions`)
+      await goToOrg(orgId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Google registration failed'
       toast.error(message)

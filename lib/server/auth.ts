@@ -1,9 +1,8 @@
 import 'server-only'
 import { getAdmin } from '@/lib/server/firebase-admin'
 import { HttpError } from '@/lib/server/http-error'
-
-// RFC 7235: the auth scheme is case-insensitive; the token is one opaque word.
-const BEARER = /^Bearer (\S+)$/i
+import { assertSameOrigin } from '@/lib/server/request-guards'
+import { readSessionCookie } from '@/lib/server/session-cookie'
 
 // Firestore document id allow-list for ids that arrive from the request.
 // Dots are excluded ('.' and '..' are invalid ids); ids matching __.*__ are
@@ -11,14 +10,16 @@ const BEARER = /^Bearer (\S+)$/i
 const ORG_ID = /^[A-Za-z0-9_-]{1,128}$/
 const RESERVED_ID = /^__.*__$/
 
-// verifyIdToken errors that mean "this token is not acceptable" (a client
+// Admin SDK errors that mean "this token / cookie is not acceptable" (a client
 // problem). Everything else is an outage/bug on our side and must not look
-// like a bad token.
+// like a bad credential.
 const TOKEN_ERROR_CODES = new Set([
   'auth/id-token-expired',
   'auth/id-token-revoked',
   'auth/argument-error',
   'auth/invalid-id-token',
+  'auth/session-cookie-expired',
+  'auth/session-cookie-revoked',
   'auth/user-disabled',
   'auth/user-not-found',
 ])
@@ -34,30 +35,117 @@ export function isOrgMember(orgData: unknown, uid: string): boolean {
   return Object.hasOwn(members, uid)
 }
 
+// firebase-admin 14 reports a failure to fetch Google's signing keys (lib/utils/jwt.js,
+// UrlKeyFetcher.refresh -> token-verifier mapJwtErrorToAuthError) as INVALID_ARGUMENT, i.e.
+// `auth/argument-error`, which is indistinguishable by code from a malformed cookie. Only
+// the message tells them apart. Both prefixes are fixed SDK texts; messages that quote
+// caller-controlled data (decode, alg, aud, iss, sub) start with "Firebase ...", never these.
+const KEY_FETCH_FAILURE_PREFIXES = [
+  'Error fetching public keys for Google certs: ', // HTTP error response from the certs URL
+  'Error while making request: ', // transport failure (DNS, timeout, reset)
+]
+
+/** True when `e` is the SDK's "could not fetch Google's signing keys" failure: our outage. */
+function isKeyFetchFailure(e: unknown): boolean {
+  const message = (e as { message?: unknown } | null)?.message
+  return (
+    typeof message === 'string' && KEY_FETCH_FAILURE_PREFIXES.some((p) => message.startsWith(p))
+  )
+}
+
 /**
- * Reads `Authorization: Bearer <Firebase ID token>` and verifies it with
- * revocation checking. Throws HttpError(401) for a missing/malformed header or
- * any token the Admin SDK rejects as invalid, and HttpError(503) when
- * verification itself fails (outage). Temporary until S01 session cookies.
+ * True when `e` is the Admin SDK rejecting a credential (bad, expired or revoked token or
+ * cookie, disabled or unknown user): a normal client condition, not a fault on our side.
+ * A failed signing-key fetch is excluded even though it carries a credential-looking code.
  */
-export async function requireUserFromBearer(req: Request): Promise<{ uid: string }> {
-  const match = BEARER.exec(req.headers.get('authorization') ?? '')
-  if (!match) throw new HttpError(401, 'unauthorized')
+export function isCredentialError(e: unknown): boolean {
+  const code = (e as { code?: unknown } | null)?.code
+  return typeof code === 'string' && TOKEN_ERROR_CODES.has(code) && !isKeyFetchFailure(e)
+}
+
+/** Short, secret-free label for logging a failure: the error code, else the class name. */
+export function errorKind(e: unknown): string {
+  const code = (e as { code?: unknown } | null)?.code
+  return typeof code === 'string' ? code : e instanceof Error ? e.name : typeof e
+}
+
+/**
+ * Maps a failed Admin Auth call to an HttpError: 401 for credential problems, 503 for
+ * everything else (including a failed signing-key fetch, see isKeyFetchFailure). `operation`
+ * only labels the log line; the error code or class name is logged, never the message body
+ * (it can quote the token or cookie).
+ */
+export function toAuthHttpError(e: unknown, operation: string): HttpError {
+  if (isCredentialError(e)) return new HttpError(401, 'unauthorized')
+  console.error(`${operation} failed`, errorKind(e))
+  return new HttpError(503, 'auth unavailable')
+}
+
+export type SessionUser = { uid: string; emailVerified: boolean }
+
+/**
+ * Authenticates a request by its `__session` cookie, verified with revocation checking.
+ * 401 for a missing/invalid/expired/revoked cookie, 503 when verification itself fails.
+ * For POST/PUT/PATCH/DELETE the `Origin` must also match the host (403 otherwise); the
+ * session is checked first so unauthenticated callers always get 401.
+ * `emailVerified` is the claim frozen into the cookie at sign-in: use requireVerifiedUser
+ * for decisions that depend on verification.
+ */
+export async function requireUser(req: Request): Promise<SessionUser> {
+  const cookie = readSessionCookie(req.headers)
+  if (!cookie) throw new HttpError(401, 'unauthorized')
 
   // Outside the try: a missing service account must surface as 500, not 401.
   const { auth } = getAdmin()
+  let uid: string
+  let claimVerified: boolean
   try {
-    const decoded = await auth.verifyIdToken(match[1], true)
-    return { uid: decoded.uid }
+    const decoded = await auth.verifySessionCookie(cookie, true)
+    uid = decoded.uid
+    claimVerified = decoded.email_verified === true
   } catch (e) {
-    const code = (e as { code?: unknown } | null)?.code
-    if (typeof code === 'string' && TOKEN_ERROR_CODES.has(code)) {
-      throw new HttpError(401, 'unauthorized')
-    }
-    // Log the error code or class name only: never the token or the message body.
-    const kind = typeof code === 'string' ? code : e instanceof Error ? e.name : typeof e
-    console.error('verifyIdToken failed', kind)
-    throw new HttpError(503, 'auth unavailable')
+    throw toAuthHttpError(e, 'verifySessionCookie')
+  }
+
+  assertSameOrigin(req)
+  return { uid, emailVerified: claimVerified }
+}
+
+/**
+ * requireUser plus a live check that the user's email is verified (403 `email_not_verified`
+ * otherwise). Reads the user record because the cookie's claim would stay stale after the
+ * user verifies their address.
+ */
+export async function requireVerifiedUser(req: Request): Promise<SessionUser> {
+  const user = await requireUser(req)
+
+  let verified: boolean
+  try {
+    verified = (await getAdmin().auth.getUser(user.uid)).emailVerified
+  } catch (e) {
+    throw toAuthHttpError(e, 'getUser')
+  }
+  if (!verified) throw new HttpError(403, 'email_not_verified')
+  return { uid: user.uid, emailVerified: true }
+}
+
+/**
+ * Signature + expiry check of a session cookie WITHOUT the revocation round-trip. Used by
+ * proxy.ts on every page navigation; API routes use requireUser for the full check.
+ * Returns false for an unacceptable cookie. Throws HttpError(503) when verification failed
+ * for reasons on our side (outage, signing keys unreachable; the proxy then answers 503
+ * instead of logging everyone out) and HttpError(500) when the server is not configured
+ * (getAdmin failure).
+ */
+export async function isSessionCookieValid(cookie: string): Promise<boolean> {
+  const { auth } = getAdmin()
+  try {
+    await auth.verifySessionCookie(cookie, false)
+    return true
+  } catch (e) {
+    const err = toAuthHttpError(e, 'verifySessionCookie')
+    if (err.status === 401) return false
+    throw err
   }
 }
 
