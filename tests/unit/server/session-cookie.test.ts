@@ -34,6 +34,18 @@ describe('readSessionCookie', () => {
     expect(readSessionCookie(headers('x__session=nope'))).toBeNull()
   })
 
+  it('does not match a cookie whose name merely starts with __session', () => {
+    expect(readSessionCookie(headers('__session2=nope'))).toBeNull()
+  })
+
+  it('uses the first __session when the header repeats it', () => {
+    expect(readSessionCookie(headers('__session=first; __session=second'))).toBe('first')
+  })
+
+  it('returns a quoted value as-is (the signature check rejects it later)', () => {
+    expect(readSessionCookie(headers('__session="abc"'))).toBe('"abc"')
+  })
+
   it.each([
     ['no Cookie header', undefined],
     ['an empty header', ''],

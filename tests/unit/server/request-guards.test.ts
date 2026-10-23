@@ -23,6 +23,8 @@ describe('assertSameOrigin', () => {
   it.each([
     ['a foreign origin', 'https://evil.example'],
     ['a look-alike host', 'http://localhost:3000.evil.example'],
+    ['a look-alike subdomain host', 'http://localhost.evil.example:3000'],
+    ['a userinfo bypass attempt', 'http://localhost:3000@evil.example'],
     ['the literal "null" origin', 'null'],
     ['garbage', 'not a url'],
   ])('rejects an unsafe method with %s', (_label, origin) => {
@@ -36,6 +38,17 @@ describe('assertSameOrigin', () => {
     })()
     expect(err).toBeInstanceOf(HttpError)
     expect(err).toMatchObject({ status: 403, message: 'forbidden' })
+  })
+
+  it('treats an uppercase scheme/host and the default port form as the request host', () => {
+    expect(() => assertSameOrigin(req('POST', 'HTTP://LOCALHOST:3000'))).not.toThrow()
+    expect(() =>
+      assertSameOrigin(req('POST', 'https://finflow.test:443', 'https://finflow.test/api/x')),
+    ).not.toThrow()
+  })
+
+  it('rejects a lowercase method with a foreign Origin', () => {
+    expect(() => assertSameOrigin(req('post', 'https://evil.example'))).toThrow(HttpError)
   })
 
   it('rejects an unsafe method without an Origin header', () => {
