@@ -72,8 +72,10 @@ export const fakeAdmin = {
       }
       return { uid, emailVerified: !fakeUnverified.has(uid) }
     }),
-    createSessionCookie: vi.fn(async (_idToken: string, _options: { expiresIn: number }) => 'minted-session-cookie'),
-    revokeRefreshTokens: vi.fn(async (_uid: string) => {}),
+    createSessionCookie: vi.fn<(idToken: string, options: { expiresIn: number }) => Promise<string>>(
+      async () => 'minted-session-cookie',
+    ),
+    revokeRefreshTokens: vi.fn<(uid: string) => Promise<void>>(async () => {}),
   },
 }
 
@@ -100,7 +102,7 @@ export function resetFakeAdmin(): void {
     plan: 'trial',
     members: { 'user-alice': { role: 'owner' } },
   })
-  for (const fn of Object.values(fakeAdmin.auth)) fn.mockClear()
+  for (const fn of Object.values(fakeAdmin.auth)) fn.mockReset()
 }
 
 /** A JSON Response, as returned by the mocked global fetch for Enable Banking calls. */

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HttpError } from '@/lib/server/http-error'
 import {
+  errorKind,
+  isCredentialError,
   isOrgMember,
   isSessionCookieValid,
   requireOrgMember,
@@ -537,5 +539,32 @@ describe('requireOrgMember', () => {
     admin.get.mockRejectedValue(outage)
 
     await expect(requireOrgMember('u1', 'org1')).rejects.toBe(outage)
+  })
+})
+
+describe('isCredentialError / errorKind', () => {
+  it('treats Admin SDK credential rejections as credential errors', () => {
+    for (const code of ['auth/argument-error', 'auth/user-disabled', 'auth/session-cookie-expired']) {
+      expect(isCredentialError(Object.assign(new Error('x'), { code }))).toBe(true)
+    }
+  })
+
+  it('does not treat outages, unknown codes, key-fetch failures or non-errors as credential errors', () => {
+    expect(isCredentialError(Object.assign(new Error('x'), { code: 'auth/internal-error' }))).toBe(false)
+    expect(isCredentialError(new Error('plain'))).toBe(false)
+    expect(isCredentialError(null)).toBe(false)
+    expect(
+      isCredentialError(
+        Object.assign(new Error('Error fetching public keys for Google certs: boom'), {
+          code: 'auth/argument-error',
+        }),
+      ),
+    ).toBe(false)
+  })
+
+  it('labels a failure by code, else class name, else typeof', () => {
+    expect(errorKind(Object.assign(new Error('x'), { code: 'auth/internal-error' }))).toBe('auth/internal-error')
+    expect(errorKind(new TypeError('x'))).toBe('TypeError')
+    expect(errorKind('boom')).toBe('string')
   })
 })

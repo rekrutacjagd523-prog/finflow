@@ -65,6 +65,81 @@ describe('POST /api/auth/session', () => {
     expect(fakeAdmin.auth.createSessionCookie).not.toHaveBeenCalled()
   })
 
+  it('fails closed (401 reauth_required) when the ID token carries no auth_time', async () => {
+    fakeAdmin.auth.verifyIdToken.mockResolvedValueOnce({ uid: 'user-alice' } as never)
+
+    const res = await POST(mintRequest({ idToken: 'token-alice' }))
+
+    expect(res.status).toBe(401)
+    expect(await res.json()).toEqual({ error: 'reauth_required' })
+    expect(fakeAdmin.auth.createSessionCookie).not.toHaveBeenCalled()
+  })
+
+  it('returns 413 for a declared body larger than 8 KiB before touching Firebase', async () => {
+    const req = mintRequest({ idToken: 'token-alice' })
+    req.headers.set('Content-Length', '9000')
+
+    const res = await POST(req)
+
+    expect(res.status).toBe(413)
+    expect(await res.json()).toEqual({ error: 'payload too large' })
+    expect(fakeAdmin.auth.verifyIdToken).not.toHaveBeenCalled()
+  })
+
+  it('returns 415 for a non-JSON content type before touching Firebase', async () => {
+    const req = new Request('http://localhost:3000/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain', Origin: 'http://localhost:3000' },
+      body: JSON.stringify({ idToken: 'token-alice' }),
+    })
+
+    const res = await POST(req)
+
+    expect(res.status).toBe(415)
+    expect(await res.json()).toEqual({ error: 'unsupported media type' })
+    expect(fakeAdmin.auth.verifyIdToken).not.toHaveBeenCalled()
+  })
+
+  it('accepts a case-insensitive JSON content type with parameters', async () => {
+    const req = new Request('http://localhost:3000/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'Application/JSON; charset=utf-8', Origin: 'http://localhost:3000' },
+      body: JSON.stringify({ idToken: 'token-alice' }),
+    })
+    expect((await POST(req)).status).toBe(204)
+  })
+
+  it('returns 401 when Firebase reports the ID token as disabled-user', async () => {
+    fakeAdmin.auth.verifyIdToken.mockRejectedValueOnce(
+      Object.assign(new Error('disabled'), { code: 'auth/user-disabled' }),
+    )
+
+    const res = await POST(mintRequest({ idToken: 'token-alice' }))
+
+    expect(res.status).toBe(401)
+    expect(fakeAdmin.auth.createSessionCookie).not.toHaveBeenCalled()
+  })
+
+  it('returns 401 when the ID token expires between verification and minting', async () => {
+    fakeAdmin.auth.createSessionCookie.mockRejectedValueOnce(
+      Object.assign(new Error('expired'), { code: 'auth/id-token-expired' }),
+    )
+
+    const res = await POST(mintRequest({ idToken: 'token-alice' }))
+
+    expect(res.status).toBe(401)
+    expect(res.headers.get('set-cookie')).toBeNull()
+  })
+
+  it('resetFakeAdmin drops leftover one-shot mock setups', async () => {
+    fakeAdmin.auth.verifyIdToken.mockRejectedValueOnce(new Error('leaked'))
+    resetFakeAdmin()
+
+    const res = await POST(mintRequest({ idToken: 'token-alice' }))
+
+    expect(res.status).toBe(204)
+  })
+
   it.each([
     ['a foreign Origin', 'https://evil.example'],
     ['no Origin', null],

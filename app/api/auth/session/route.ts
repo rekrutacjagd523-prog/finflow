@@ -11,6 +11,8 @@ export const runtime = 'nodejs'
 // a stolen, older ID token cannot be exchanged for a 7-day cookie.
 const MAX_SIGN_IN_AGE_SECONDS = 5 * 60
 const MAX_ID_TOKEN_LENGTH = 4096
+// A legitimate body is `{"idToken":"<=4096 chars>"}`; anything declared larger is refused unread.
+const MAX_BODY_BYTES = 8192
 
 // POST /api/auth/session  { idToken }
 // Not to be confused with /api/enablebanking/session (starts a bank connection).
@@ -18,6 +20,14 @@ const MAX_ID_TOKEN_LENGTH = 4096
 export async function POST(req: Request) {
   try {
     assertSameOrigin(req)
+
+    const declaredLength = req.headers.get('content-length')
+    if (declaredLength !== null && Number(declaredLength) > MAX_BODY_BYTES) {
+      throw new HttpError(413, 'payload too large')
+    }
+    if (!(req.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) {
+      throw new HttpError(415, 'unsupported media type')
+    }
 
     const body: unknown = await req.json().catch(() => null)
     const idToken = (body as { idToken?: unknown } | null)?.idToken
@@ -33,7 +43,9 @@ export async function POST(req: Request) {
     } catch (e) {
       throw toAuthHttpError(e, 'verifyIdToken')
     }
-    if (Math.floor(Date.now() / 1000) - decoded.auth_time > MAX_SIGN_IN_AGE_SECONDS) {
+    // Written so that a missing or non-numeric auth_time (NaN) fails closed.
+    const ageSeconds = Math.floor(Date.now() / 1000) - decoded.auth_time
+    if (!(ageSeconds <= MAX_SIGN_IN_AGE_SECONDS)) {
       throw new HttpError(401, 'reauth_required')
     }
 

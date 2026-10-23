@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { fakeAdmin, resetFakeAdmin } from '@/tests/unit/helpers/fake-admin'
 import { POST } from '@/app/api/auth/logout/route'
+import { HttpError } from '@/lib/server/http-error'
 
 vi.mock('@/lib/server/firebase-admin', async () => {
   const { fakeAdmin: admin } = await import('@/tests/unit/helpers/fake-admin')
@@ -17,7 +18,7 @@ function logoutRequest(cookie?: string, origin: string | null = 'http://localhos
 }
 
 describe('POST /api/auth/logout', () => {
-  let errorSpy: { mockRestore: () => void }
+  let errorSpy: MockInstance<typeof console.error>
 
   beforeEach(() => {
     resetFakeAdmin()
@@ -45,8 +46,19 @@ describe('POST /api/auth/logout', () => {
     expect(fakeAdmin.auth.revokeRefreshTokens).not.toHaveBeenCalled()
   })
 
-  it('clears a garbage cookie without revoking anything', async () => {
+  it('clears a garbage cookie without revoking anything and without logging', async () => {
     const res = await POST(logoutRequest('__session=garbage'))
+
+    expect(res.status).toBe(204)
+    expect(res.headers.get('set-cookie')).toBe(CLEARED)
+    expect(fakeAdmin.auth.revokeRefreshTokens).not.toHaveBeenCalled()
+    expect(errorSpy.mock.calls).toEqual([])
+  })
+
+  it('still clears the cookie when the Admin SDK is not configured', async () => {
+    fakeAdmin.auth.verifySessionCookie.mockRejectedValueOnce(new HttpError(500, 'server not configured'))
+
+    const res = await POST(logoutRequest('__session=token-alice'))
 
     expect(res.status).toBe(204)
     expect(res.headers.get('set-cookie')).toBe(CLEARED)

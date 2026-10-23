@@ -1,3 +1,4 @@
+import { errorKind, isCredentialError } from '@/lib/server/auth'
 import { getAdmin } from '@/lib/server/firebase-admin'
 import { errorResponse } from '@/lib/server/http-error'
 import { assertSameOrigin } from '@/lib/server/request-guards'
@@ -23,10 +24,9 @@ export async function POST(req: Request) {
       const { uid } = await auth.verifySessionCookie(cookie, false)
       await auth.revokeRefreshTokens(uid)
     } catch (e) {
-      // Best effort: the cookie is cleared below regardless. Log the code only.
-      const code = (e as { code?: unknown } | null)?.code
-      const kind = typeof code === 'string' ? code : e instanceof Error ? e.name : typeof e
-      console.error('logout revoke failed', kind)
+      // Best effort: the cookie is cleared below regardless. A rejected (expired, garbage)
+      // cookie is a normal condition and not logged; anything else is, by code only.
+      if (!isCredentialError(e)) console.error('logout revoke failed', errorKind(e))
     }
   }
 

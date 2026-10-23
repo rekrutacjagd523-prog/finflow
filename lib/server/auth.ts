@@ -57,18 +57,30 @@ function isKeyFetchFailure(e: unknown): boolean {
 }
 
 /**
+ * True when `e` is the Admin SDK rejecting a credential (bad, expired or revoked token or
+ * cookie, disabled or unknown user): a normal client condition, not a fault on our side.
+ * A failed signing-key fetch is excluded even though it carries a credential-looking code.
+ */
+export function isCredentialError(e: unknown): boolean {
+  const code = (e as { code?: unknown } | null)?.code
+  return typeof code === 'string' && TOKEN_ERROR_CODES.has(code) && !isKeyFetchFailure(e)
+}
+
+/** Short, secret-free label for logging a failure: the error code, else the class name. */
+export function errorKind(e: unknown): string {
+  const code = (e as { code?: unknown } | null)?.code
+  return typeof code === 'string' ? code : e instanceof Error ? e.name : typeof e
+}
+
+/**
  * Maps a failed Admin Auth call to an HttpError: 401 for credential problems, 503 for
  * everything else (including a failed signing-key fetch, see isKeyFetchFailure). `operation`
  * only labels the log line; the error code or class name is logged, never the message body
  * (it can quote the token or cookie).
  */
 export function toAuthHttpError(e: unknown, operation: string): HttpError {
-  const code = (e as { code?: unknown } | null)?.code
-  if (typeof code === 'string' && TOKEN_ERROR_CODES.has(code) && !isKeyFetchFailure(e)) {
-    return new HttpError(401, 'unauthorized')
-  }
-  const kind = typeof code === 'string' ? code : e instanceof Error ? e.name : typeof e
-  console.error(`${operation} failed`, kind)
+  if (isCredentialError(e)) return new HttpError(401, 'unauthorized')
+  console.error(`${operation} failed`, errorKind(e))
   return new HttpError(503, 'auth unavailable')
 }
 
