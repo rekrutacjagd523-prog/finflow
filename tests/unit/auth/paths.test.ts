@@ -50,6 +50,8 @@ describe('isAppPath', () => {
 describe('safeRedirectPath', () => {
   it.each([
     '/org1/settings',
+    '/org1/settings/banks',
+    '/org1/settings/banks?eb_error=1',
     '/org1/transactions?month=2026-10',
     '/',
     // Same-origin literal path (encoded slashes stay in one segment), not a protocol-relative URL.

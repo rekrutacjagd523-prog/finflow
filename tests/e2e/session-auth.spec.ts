@@ -211,13 +211,24 @@ test.describe('server session (emulators)', () => {
     const { orgId } = await registerViaUi(page)
     const planted = Buffer.from(JSON.stringify({ sessionId: 'attacker-session' })).toString('base64url')
 
-    await page.goto(`/${orgId}/settings?eb_auth=${planted}`)
+    await page.goto(`/${orgId}/settings/banks?eb_auth=${planted}`)
 
     await expect(page.getByText('Підключення не підтверджено')).toBeVisible()
     expect(new URL(page.url()).searchParams.has('eb_auth')).toBe(false)
     // Nothing was saved: no connection row (it would be named "Банк" without a pending entry).
     await expect(page.getByText('Банк', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/підключено$/)).toHaveCount(0)
+  })
+
+  test('the old settings URL sends a bank return value to the Banks section', async ({ page }) => {
+    const { orgId } = await registerViaUi(page)
+    const planted = Buffer.from(JSON.stringify({ sessionId: 'attacker-session' })).toString('base64url')
+
+    await page.goto(`/${orgId}/settings?eb_auth=${planted}`)
+
+    await page.waitForURL(new RegExp(`/${orgId}/settings/banks`))
+    await expect(page.getByText('Підключення не підтверджено')).toBeVisible()
+    expect(new URL(page.url()).searchParams.has('eb_auth')).toBe(false)
   })
 
   test('login ignores an off-site ?redirect= and honours the app return path after re-login', async ({ page }) => {
@@ -235,12 +246,12 @@ test.describe('server session (emulators)', () => {
     expect(landed.hostname).toBe('localhost')
     expect(landed.pathname).toBe(`/${orgId}/transactions`)
 
-    // Legit return path: a signed-out visit to settings goes through /login and comes back.
+    // Legit return path: a signed-out visit to the Banks settings goes through /login and comes back.
     await signOutViaSidebar(page)
-    await page.goto(`/${orgId}/settings`)
-    await page.waitForURL(new RegExp(`/login\\?redirect=%2F${orgId}%2Fsettings$`))
+    await page.goto(`/${orgId}/settings/banks`)
+    await page.waitForURL(new RegExp(`/login\\?redirect=%2F${orgId}%2Fsettings%2Fbanks$`))
     await signInViaLoginForm(page, email)
-    await page.waitForURL(new RegExp(`/${orgId}/settings$`))
-    expect(new URL(page.url()).pathname).toBe(`/${orgId}/settings`)
+    await page.waitForURL(new RegExp(`/${orgId}/settings/banks$`))
+    expect(new URL(page.url()).pathname).toBe(`/${orgId}/settings/banks`)
   })
 })

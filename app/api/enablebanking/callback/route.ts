@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     return errorResponse(e)
   }
   const orgId = verified.orgId
-  const settingsPath = `/${encodeURIComponent(orgId)}/settings`
+  const settingsPath = `/${encodeURIComponent(orgId)}/settings/banks`
 
   try {
     const { uid } = await requireUser(req)

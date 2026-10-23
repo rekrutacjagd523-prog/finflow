@@ -2,7 +2,7 @@
 // Pure (storage is injected), so it is unit-testable and safe in the browser bundle.
 //
 // The callback hands the new bank session id back in the URL. Without this guard, anyone could
-// send a signed-in user a link `/<org>/settings?eb_auth=...` and make their browser save a
+// send a signed-in user a link `/<org>/settings/banks?eb_auth=...` and make their browser save a
 // foreign bank session into that org. A connection is only accepted when this tab started one
 // (handleConnect writes `eb_pending` to sessionStorage right before leaving for the bank).
 // The proper fix, a server-side write bound to the signed state, is planned for S09.

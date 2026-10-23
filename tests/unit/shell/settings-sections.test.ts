@@ -1,0 +1,71 @@
+import { describe, expect, it } from 'vitest'
+import {
+  SETTINGS_SECTIONS,
+  activeSettingsSection,
+  settingsIndexRedirect,
+  settingsPath,
+} from '@/lib/shell/settings-sections'
+
+describe('SETTINGS_SECTIONS', () => {
+  it('lists the four sections in menu order', () => {
+    expect(SETTINGS_SECTIONS.map((s) => [s.slug, s.label])).toEqual([
+      ['company', 'Компанія'],
+      ['categories', 'Категорії'],
+      ['banks', 'Банки'],
+      ['subscription', 'Підписка'],
+    ])
+  })
+})
+
+describe('settingsPath', () => {
+  it('builds the section URL', () => {
+    expect(settingsPath('org1', 'banks')).toBe('/org1/settings/banks')
+  })
+
+  it('encodes the org id', () => {
+    expect(settingsPath('a b', 'company')).toBe('/a%20b/settings/company')
+  })
+})
+
+describe('activeSettingsSection', () => {
+  it.each([
+    ['/org1/settings/company', 'company'],
+    ['/org1/settings/categories', 'categories'],
+    ['/org1/settings/banks', 'banks'],
+    ['/org1/settings/subscription/extra', 'subscription'],
+  ])('%s -> %s', (path, section) => {
+    expect(activeSettingsSection(path, 'org1')).toBe(section)
+  })
+
+  it.each(['/org1/settings', '/org1/settings/unknown', '/org2/settings/banks', '/org1/transactions', '/'])(
+    '%s -> null',
+    (path) => {
+      expect(activeSettingsSection(path, 'org1')).toBeNull()
+    },
+  )
+})
+
+describe('settingsIndexRedirect', () => {
+  it('sends a plain visit to Company', () => {
+    expect(settingsIndexRedirect('org1', {})).toBe('/org1/settings/company')
+  })
+
+  it('keeps the query string', () => {
+    expect(settingsIndexRedirect('org1', { tab: 'x', q: 'a b&c' })).toBe('/org1/settings/company?tab=x&q=a+b%26c')
+  })
+
+  it('keeps repeated keys and skips undefined values', () => {
+    expect(settingsIndexRedirect('org1', { a: ['1', '2'], b: undefined })).toBe('/org1/settings/company?a=1&a=2')
+  })
+
+  it.each([
+    [{ eb_auth: 'abc' }, '/org1/settings/banks?eb_auth=abc'],
+    [{ eb_error: '1' }, '/org1/settings/banks?eb_error=1'],
+  ])('sends a bank return value to Banks: %o', (query, expected) => {
+    expect(settingsIndexRedirect('org1', query)).toBe(expected)
+  })
+
+  it('encodes the org id', () => {
+    expect(settingsIndexRedirect('a/b', {})).toBe('/a%2Fb/settings/company')
+  })
+})

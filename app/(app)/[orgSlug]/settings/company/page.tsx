@@ -1,0 +1,93 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { doc, updateDoc } from 'firebase/firestore'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useOrg } from '@/lib/hooks/useOrg'
+import { db } from '@/lib/firebase/firebase'
+
+const CURRENCIES = [
+  { value: 'UAH', label: 'UAH — Ukrainian Hryvnia' },
+  { value: 'EUR', label: 'EUR — Euro' },
+  { value: 'USD', label: 'USD — US Dollar' },
+  { value: 'PLN', label: 'PLN — Polish Zloty' },
+]
+
+export default function CompanySettingsPage() {
+  const params = useParams()
+  const orgId = params.orgSlug as string
+  const { org, switchOrg } = useOrg()
+
+  const [name, setName] = useState('')
+  const [currency, setCurrency] = useState('UAH')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (org) {
+      setName(org.name)
+      setCurrency(org.currency)
+    }
+  }, [org])
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!orgId || !name) return
+    setSaving(true)
+    try {
+      await updateDoc(doc(db, 'organizations', orgId), { name, currency })
+      // Reload the org so the header and the sidebar total show the new name and currency.
+      await switchOrg(orgId)
+      toast.success('Збережено')
+    } catch {
+      toast.error('Помилка збереження')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const isChanged = org && (name !== org.name || currency !== org.currency)
+
+  return (
+    <Card className="ring-line">
+      <CardHeader>
+        <CardTitle className="text-base font-semibold text-ink">Компанія</CardTitle>
+        <CardDescription className="text-ink-muted">Назва та валюта</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="orgName" className="text-ink">Назва</Label>
+            <Input
+              id="orgName"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-9 rounded-control border-line bg-surface"
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="currency" className="text-ink">Валюта</Label>
+            <select
+              id="currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="h-9 w-full rounded-control border border-line bg-surface px-3 text-sm text-ink outline-none focus:border-brand"
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+          <Button type="submit" size="lg" disabled={!isChanged || saving}>
+            {saving ? 'Збереження...' : 'Зберегти'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
