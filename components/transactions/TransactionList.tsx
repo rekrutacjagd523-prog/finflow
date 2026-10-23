@@ -1,42 +1,32 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, ArrowLeftRight, ReceiptText } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils/currency'
-import { formatDate } from '@/lib/utils/date'
+import { ReceiptText } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TransactionForm } from '@/components/forms/TransactionForm'
-import { deleteTransaction } from '@/lib/firebase/transactions'
+import { cn } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils/currency'
+import { formatDateShort } from '@/lib/utils/date'
 import type { Transaction, Account, Category } from '@/types'
 
-const TYPE_CONFIG = {
-  income: {
-    icon: ArrowDownLeft,
-    color: '#22c55e',
-    label: 'Дохід',
-    sign: '+',
-  },
-  expense: {
-    icon: ArrowUpRight,
-    color: '#ef4444',
-    label: 'Витрата',
-    sign: '-',
-  },
-  transfer: {
-    icon: ArrowLeftRight,
-    color: '#6366f1',
-    label: 'Переказ',
-    sign: '↔',
-  },
+// Sign and colour of an amount; a transfer moves money between own accounts, so it stays neutral.
+const AMOUNT_STYLE: Record<Transaction['type'], { sign: string; className: string }> = {
+  income: { sign: '+', className: 'text-income' },
+  expense: { sign: '−', className: 'text-expense' },
+  transfer: { sign: '', className: 'text-ink-muted' },
 }
 
 function formatGroupKey(key: string): string {
   const date = new Date(key + 'T12:00:00')
-  return new Intl.DateTimeFormat('uk-UA', {
+  const label = new Intl.DateTimeFormat('uk-UA', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
     weekday: 'short',
   }).format(date)
+  // Capitalise only the first letter: the CSS `capitalize` class would also uppercase the month and «р.».
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 interface TransactionListProps {
@@ -64,9 +54,9 @@ export function TransactionList({
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+      <div className="space-y-2" aria-busy="true">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-11 animate-pulse rounded-control bg-canvas" />
         ))}
       </div>
     )
@@ -76,11 +66,11 @@ export function TransactionList({
 
   if (keys.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <ReceiptText className="h-12 w-12 text-gray-200 mb-4" />
-        <p className="text-gray-500 font-medium">Транзакцій ще немає</p>
-        <p className="text-sm text-gray-400 mt-1">
-          Натисніть «+ Дохід», «- Витрата» або «↔ Переказ», щоб додати першу транзакцію
+      <div className="flex flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface py-16 text-center">
+        <ReceiptText className="mb-4 size-12 text-ink-subtle" />
+        <p className="font-medium text-ink">Операцій ще немає</p>
+        <p className="mt-1 max-w-sm text-sm text-ink-muted">
+          Натисніть «Дохід», «Витрата» або «Переказ» у шапці, щоб додати першу операцію
         </p>
       </div>
     )
@@ -88,90 +78,88 @@ export function TransactionList({
 
   return (
     <>
-      <div className="space-y-6">
-        {keys.map((dateKey) => {
-          const txs = grouped[dateKey]
-          const dayTotal = txs.reduce((sum, tx) => {
-            if (tx.type === 'income') return sum + tx.amount
-            if (tx.type === 'expense') return sum - tx.amount
-            return sum
-          }, 0)
+      <div className="overflow-hidden rounded-panel border border-line bg-surface">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-28 pl-4">Дата</TableHead>
+              <TableHead className="w-40 text-right">Сума</TableHead>
+              <TableHead>Рахунок</TableHead>
+              <TableHead>Категорія</TableHead>
+              <TableHead className="pr-4">Коментар</TableHead>
+            </TableRow>
+          </TableHeader>
+          {keys.map((dateKey) => {
+            const txs = grouped[dateKey]
+            const dayTotal = txs.reduce((sum, tx) => {
+              if (tx.type === 'income') return sum + tx.amount
+              if (tx.type === 'expense') return sum - tx.amount
+              return sum
+            }, 0)
+            const dayStyle = dayTotal >= 0 ? AMOUNT_STYLE.income : AMOUNT_STYLE.expense
 
-          return (
-            <div key={dateKey}>
-              {/* Date header */}
-              <div className="flex items-center justify-between mb-2 px-1">
-                <span className="text-sm font-medium text-gray-500 capitalize">
-                  {formatGroupKey(dateKey)}
-                </span>
-                <span
-                  className="text-sm font-semibold tabular-nums"
-                  style={{ color: dayTotal >= 0 ? '#22c55e' : '#ef4444' }}
-                >
-                  {dayTotal >= 0 ? '+' : ''}
-                  {formatCurrency(dayTotal, txs[0]?.currency ?? 'UAH')}
-                </span>
-              </div>
-
-              {/* Transaction rows */}
-              <div className="rounded-xl border border-gray-100 overflow-hidden">
-                {txs.map((tx, idx) => {
-                  const cfg = TYPE_CONFIG[tx.type]
-                  const Icon = cfg.icon
+            return (
+              <TableBody key={dateKey} className="[&_tr:last-child]:border-b">
+                <TableRow className="bg-canvas hover:bg-canvas">
+                  <TableCell colSpan={5} className="px-4 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-ink-muted">{formatGroupKey(dateKey)}</span>
+                      <span className={cn('text-xs font-semibold tabular-nums', dayStyle.className)}>
+                        {dayStyle.sign}
+                        {formatCurrency(Math.abs(dayTotal), txs[0]?.currency ?? 'UAH')}
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {txs.map((tx) => {
+                  const amount = AMOUNT_STYLE[tx.type]
                   const account = accountMap[tx.accountId]
                   const toAccount =
-                    tx.type === 'transfer' && tx.counterpartyId
-                      ? accountMap[tx.counterpartyId]
-                      : null
+                    tx.type === 'transfer' && tx.counterpartyId ? accountMap[tx.counterpartyId] : null
                   const category = tx.categoryId ? categoryMap[tx.categoryId] : null
 
                   return (
-                    <div
+                    <TableRow
                       key={tx.id}
+                      tabIndex={0}
                       onClick={() => setEditTx(tx)}
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                      style={{
-                        borderTop: idx > 0 ? '1px solid #f3f4f6' : undefined,
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') setEditTx(tx)
                       }}
+                      className="cursor-pointer hover:bg-canvas focus-visible:bg-brand-soft focus-visible:outline-none"
                     >
-                      {/* Icon */}
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: cfg.color + '18' }}
-                      >
-                        <Icon className="h-4 w-4" style={{ color: cfg.color }} />
-                      </div>
-
-                      {/* Category + account */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {category?.name ?? cfg.label}
-                        </p>
-                        <p className="text-xs text-gray-400 truncate">
-                          {tx.type === 'transfer' && toAccount
-                            ? `${account?.name ?? '—'} → ${toAccount.name}`
-                            : (account?.name ?? '—')}
-                          {tx.description && ` · ${tx.description}`}
-                        </p>
-                      </div>
-
-                      {/* Amount */}
-                      <div className="text-right shrink-0">
-                        <p
-                          className="text-sm font-semibold tabular-nums"
-                          style={{ color: cfg.color }}
-                        >
-                          {cfg.sign}
-                          {formatCurrency(tx.amount, tx.currency)}
-                        </p>
-                      </div>
-                    </div>
+                      <TableCell className="pl-4 text-ink-muted tabular-nums">{formatDateShort(tx.date)}</TableCell>
+                      <TableCell className={cn('text-right font-semibold tabular-nums', amount.className)}>
+                        {amount.sign}
+                        {formatCurrency(tx.amount, tx.currency)}
+                      </TableCell>
+                      <TableCell className="text-ink">
+                        <span className="block max-w-56 truncate">
+                          {toAccount ? `${account?.name ?? '—'} → ${toAccount.name}` : (account?.name ?? '—')}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {category ? (
+                          <Badge variant="chip">
+                            <span className="size-2 rounded-full" style={{ backgroundColor: category.color }} />
+                            {category.name}
+                          </Badge>
+                        ) : tx.type === 'transfer' ? (
+                          <Badge variant="chip">Переказ</Badge>
+                        ) : (
+                          <span className="text-ink-subtle">Без категорії</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="pr-4 text-ink-muted">
+                        <span className="block max-w-72 truncate">{tx.description || '—'}</span>
+                      </TableCell>
+                    </TableRow>
                   )
                 })}
-              </div>
-            </div>
-          )
-        })}
+              </TableBody>
+            )
+          })}
+        </Table>
       </div>
 
       {editTx && (
