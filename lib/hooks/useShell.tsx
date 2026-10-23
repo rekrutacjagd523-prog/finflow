@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -9,7 +10,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { AccountForm } from '@/components/forms/AccountForm'
 import { TransactionForm } from '@/components/forms/TransactionForm'
@@ -72,7 +73,14 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
   // The forms mount on open and unmount on close, so every opening starts from fresh form state.
   const [transactionFormType, setTransactionFormType] = useState<TransactionType | null>(null)
   const [accountForm, setAccountForm] = useState<{ account: Account | null } | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  // The drawer remembers the path it was opened on and closes as soon as the route changes
+  // (browser Back, a link inside it). Adjusting state during render is the React-documented way
+  // to reset state when an input changes, and it needs no effect (no synchronous setState in one).
+  const pathname = usePathname()
+  const [drawerPath, setDrawerPath] = useState<string | null>(null)
+  if (drawerPath !== null && drawerPath !== pathname) setDrawerPath(null)
+  const drawerOpen = drawerPath !== null
+  const setDrawerOpen = useCallback((open: boolean) => setDrawerPath(open ? pathname : null), [pathname])
 
   const sidebarCollapsed = useSyncExternalStore(
     sidebarStore.subscribe,

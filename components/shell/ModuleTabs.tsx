@@ -13,7 +13,7 @@ export function ModuleTabs() {
   const active = activeModule(pathname, orgId)
 
   return (
-    <nav aria-label="Модулі" className="flex shrink-0 gap-6 overflow-x-auto border-b border-line px-4 lg:px-6">
+    <nav aria-label="Модулі" className="sticky top-0 z-10 flex shrink-0 gap-6 overflow-x-auto border-b border-line bg-surface px-4 lg:px-6">
       {MODULE_TABS.map((tab) => {
         const isActive = tab.key === active
         return (
