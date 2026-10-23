@@ -32,7 +32,7 @@ Cookie `__session=1`, яку клієнт ставить сам, замінен�
 **Endpoints** (Node runtime, `app/api/auth/*`):
 
 - `POST /api/auth/session`: тіло `{ idToken }`. Сервер виконує `verifyIdToken(idToken, true)`, відхиляє токен, чий `auth_time` старший за 5 хвилин (401 `reauth_required`, клієнт перелогінюється), перевіряє `Origin` так само, як `requireUser` (розділ 2), потім `createSessionCookie(idToken, { expiresIn: 7 днів })` і ставить cookie `__session`: `HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`, `Secure` у production (на `http://localhost` без `Secure`, інакше браузер її не збереже).
-- `POST /api/auth/logout`: якщо cookie валідна, викликає `revokeRefreshTokens(uid)`. Завжди стирає cookie (`Max-Age=0`) і повертає 204, навіть якщо cookie вже непридатна.
+- `POST /api/auth/logout`: лише якщо сесія жива (`verifySessionCookie(cookie, true)`, з перевіркою відкликання), викликає `revokeRefreshTokens(uid)`; відкликана чи прострочена cookie лише стирається. Завжди стирає cookie (`Max-Age=0`) і повертає 204, навіть якщо cookie вже непридатна.
 
 **Клієнт** (`useAuth`, `lib/firebase/auth.ts`):
 
@@ -129,6 +129,9 @@ Callback лишається GET (редірект банку є top-level нав
 - **`AuthProvider`** — один екземпляр у кореневому layout (вкладений у `(app)/layout.tsx` прибрано). Якщо в SDK немає користувача, він стирає серверну сесію, а на сторінці застосунку ще й робить жорсткий `window.location.replace` на `/login` (з `?redirect=`, окрім випадку, коли користувач щойно вийшов). Бічна панель при виході лише чекає на `signOut()`.
 - **`safeRedirectPath`** відхиляє: не відносні шляхи, `//`, зворотні скісні риски, керівні символи, шляхи API (після нормалізації й декодування URL), шляхи, що зводяться до `//`, і сторінки автентифікації. `/login` поважає `?redirect=` лише коли в користувача є організація.
 - **`ebFetch`** використовує same-origin cookie; на 401 очищає сесію й веде на `/login?redirect=…`.
-- **`/api/auth/logout`** відкликає **усі** refresh-токени користувача, тобто виходить з усіх пристроїв. Те саме запускає стан «у браузері немає користувача SDK».
+- **`/api/auth/logout`** відкликає **усі** refresh-токени користувача, тобто виходить з усіх пристроїв. Те саме запускає стан «у браузері немає користувача SDK». Відкликає лише через **живу** сесію (`verifySessionCookie` із перевіркою відкликання): застаріла відкликана cookie (вкладка після 401 або пристрій, де зник користувач SDK) лише стирається, інакше два пристрої могли б виходити один за одного й закінчувати новіші сесії.
+- **Повернення з банку:** сторінка налаштувань приймає `?eb_auth=` лише для підключення, яке почала ця вкладка (`eb_pending` у `sessionStorage`, одноразово, `lib/enablebanking/pending.ts`), бо callback віддає id банківської сесії в URL; `eb_auth` завжди прибирається з URL. Повноцінне виправлення (запис на сервері, прив'язаний до uid+org) — S09.
+- **Емулятор проти production:** емулятор Auth (і `firebase-admin` в режимі емулятора) ЗАВЖДИ перевіряє відкликання, тож у E2E proxy суворіший, ніж у production, а E2E-тест «відкликана cookie на logout» не відрізняє старий код logout (запобіжник — юніт-тест).
+- **Ліміт розміру `POST /api/auth/session`** (8 КБ) діє на заявлений `Content-Length`; chunked-тіло обмежує лише платформа (4,5 МБ на Vercel).
 - **Реєстрація** додатково викликає `switchOrg(orgId)` (виправлено гонку в `OrgProvider`: `loadSeq` у `useOrg`, `switchOrg` бере `auth.currentUser`). Лист підтвердження надсилається best-effort; текст банера не стверджує, що лист надіслано; кнопка «Надіслати лист ще раз».
 - **Стратегія тестів:** `tests/unit/server/route-auth-coverage.test.ts` вимагає від кожного обробника в `app/api` виклику `await requireUser(...)`/`requireVerifiedUser(...)` або запису в allow-list із причиною (замість первісного правила «усі мутуючі роути»); юніт-тести хелперів, роутів і proxy; E2E `tests/e2e/session-auth.spec.ts` (+ `tests/e2e/helpers/emulator-auth.ts`) на емуляторах Auth + Firestore.
