@@ -37,9 +37,10 @@ async function signInViaLoginForm(page: Page, email: string): Promise<void> {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 }
 
-/** Sidebar sign-out; the AuthProvider performs the hard redirect to plain /login. */
-async function signOutViaSidebar(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Sign out' }).click()
+/** Sign-out from the header profile menu; the AuthProvider performs the hard redirect to plain /login. */
+async function signOutViaProfileMenu(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Профіль' }).click()
+  await page.getByRole('menuitem', { name: 'Вийти' }).click()
   await page.waitForURL(/\/login$/)
 }
 
@@ -134,7 +135,7 @@ test.describe('server session (emulators)', () => {
     await page.reload()
     // The company name renders only once the SDK user AND the org are loaded, so "banner gone"
     // below cannot pass merely because the user has not been restored yet.
-    await expect(page.locator('aside').getByText(companyName, { exact: true })).toBeVisible()
+    await expect(page.getByTestId('org-switcher-name')).toHaveText(companyName)
     await expect(page.getByTestId('verify-email-banner')).toHaveCount(0)
     const verified = await page.context().request.post('/api/enablebanking/session', {
       headers: { Origin: ORIGIN },
@@ -160,7 +161,7 @@ test.describe('server session (emulators)', () => {
 
     // Revocation is second-granular: make sure it happens after the sign-in second.
     await page.waitForTimeout(1_100)
-    await signOutViaSidebar(page)
+    await signOutViaProfileMenu(page)
     expect((await page.context().cookies()).find((c) => c.name === '__session')).toBeUndefined()
 
     // A copied cookie no longer works on the API (the proxy deliberately skips the revocation check,
@@ -183,7 +184,7 @@ test.describe('server session (emulators)', () => {
 
     // Sign out (revokes everything up to now), then sign in again: cookie2 is minted later.
     await page.waitForTimeout(1_100)
-    await signOutViaSidebar(page)
+    await signOutViaProfileMenu(page)
     await signInViaLoginForm(page, email)
     await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
     const cookie2 = (await page.context().cookies()).find((c) => c.name === '__session')?.value
@@ -236,7 +237,7 @@ test.describe('server session (emulators)', () => {
     // Same second-granular revocation as above. Every later sign-in mints a NEW cookie whose
     // sign-in time is after the revocation, so it is not revoked.
     await page.waitForTimeout(1_100)
-    await signOutViaSidebar(page)
+    await signOutViaProfileMenu(page)
 
     // Open-redirect attempt: the user lands on their own first org, never on the foreign host.
     await page.goto('/login?redirect=https://evil.example')
@@ -247,7 +248,7 @@ test.describe('server session (emulators)', () => {
     expect(landed.pathname).toBe(`/${orgId}/transactions`)
 
     // Legit return path: a signed-out visit to the Banks settings goes through /login and comes back.
-    await signOutViaSidebar(page)
+    await signOutViaProfileMenu(page)
     await page.goto(`/${orgId}/settings/banks`)
     await page.waitForURL(new RegExp(`/login\\?redirect=%2F${orgId}%2Fsettings%2Fbanks$`))
     await signInViaLoginForm(page, email)

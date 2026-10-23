@@ -61,22 +61,22 @@ test.describe('smoke on emulators', () => {
     await page.getByLabel('Company name', { exact: true }).fill(orgName)
     await page.getByRole('button', { name: 'Try 14 days free' }).click()
 
-    // 2. Redirect to /{orgId}/transactions. The sidebar shows the org name only after
+    // 2. Redirect to /{orgId}/transactions. The header shows the org name only after
     //    useOrg loaded it, which exercises the organizations get/list security rules.
     await page.waitForURL(/\/[A-Za-z0-9]{20}\/transactions$/)
     const orgId = new URL(page.url()).pathname.split('/')[1]
-    await expect(page.getByRole('heading', { name: 'Транзакції' })).toBeVisible()
-    await expect(page.locator('aside').getByText(orgName, { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Платежі' })).toBeVisible()
+    await expect(page.getByTestId('org-switcher-name')).toHaveText(orgName)
 
-    // 3. Add an account (components/forms/AccountForm.tsx).
-    await page.getByRole('button', { name: '+ Додати рахунок', exact: true }).click()
+    // 3. Add an account from the sidebar (components/forms/AccountForm.tsx).
+    await page.getByRole('button', { name: 'Додати рахунок', exact: true }).click()
     const accountDialog = page.getByRole('dialog')
     await expect(accountDialog.getByText('Новий рахунок', { exact: true })).toBeVisible()
     await accountDialog.getByLabel('Назва', { exact: true }).fill(accountName)
     await accountDialog.getByRole('button', { name: 'Створити', exact: true }).click()
     await expect(accountDialog).toBeHidden()
-    // Scoped to <p>: the account filter <select> also gets an <option> with this name.
-    await expect(page.locator('p', { hasText: accountName })).toBeVisible()
+    // Scoped to the accounts sidebar: the account filter <select> also gets an <option> with this name.
+    await expect(page.getByRole('complementary', { name: 'Рахунки' }).getByText(accountName, { exact: true })).toBeVisible()
 
     // 4. Add an income transaction on that account (components/forms/TransactionForm.tsx).
     await page.getByRole('button', { name: 'Дохід', exact: true }).click()
@@ -89,9 +89,9 @@ test.describe('smoke on emulators', () => {
     await txDialog.getByRole('button', { name: 'Додати', exact: true }).click()
     await expect(txDialog).toBeHidden()
 
-    // 5. Cash Flow (sidebar "Analytics" -> /{orgId}/analytics/cashflow) shows the income
+    // 5. Cash Flow (module tab «Аналітика» -> /{orgId}/analytics/cashflow) shows the income
     //    in the current month row and in the "Доходи" summary card.
-    await page.getByRole('link', { name: 'Analytics' }).click()
+    await page.getByRole('navigation', { name: 'Модулі' }).getByRole('link', { name: 'Аналітика' }).click()
     await page.waitForURL(`**/${orgId}/analytics/cashflow`)
     await expect(page.getByRole('heading', { name: 'Cash Flow' })).toBeVisible()
     const now = new Date()
