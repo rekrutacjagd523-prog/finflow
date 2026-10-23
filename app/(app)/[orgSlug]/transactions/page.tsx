@@ -12,10 +12,10 @@ export default function TransactionsPage() {
   const { orgId, accounts, incomeCategories, expenseCategories, selectedAccountId, selectAccount } = useShell()
   const [filters, setFilters] = useState<TransactionFilters>({})
 
-  // The sidebar selection wins over the toolbar's account filter (as the account strip did).
+  // The account filter is the shell's selected account (sidebar and toolbar select share it).
   const effectiveFilters: TransactionFilters = {
     ...filters,
-    accountId: selectedAccountId ?? filters.accountId,
+    accountId: selectedAccountId ?? undefined,
   }
 
   const { grouped, loading } = useTransactions(orgId, effectiveFilters)
@@ -45,8 +45,14 @@ export default function TransactionsPage() {
         accounts={accounts}
         incomeCategories={incomeCategories}
         expenseCategories={expenseCategories}
-        filters={filters}
-        onChange={setFilters}
+        filters={effectiveFilters}
+        onChange={(next) => {
+          // The account lives in the shell (sidebar selection): the toolbar select shows and changes
+          // that one value, so the two controls never disagree.
+          const { accountId, ...rest } = next
+          setFilters(rest)
+          if (accountId !== selectedAccountId) selectAccount(accountId ?? null)
+        }}
       />
 
       <TransactionList
