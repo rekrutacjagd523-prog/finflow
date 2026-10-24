@@ -3,9 +3,8 @@ import { HttpError } from '@/lib/server/http-error'
 import {
   errorKind,
   isCredentialError,
-  isOrgMember,
   isSessionCookieValid,
-  requireOrgMember,
+  requireOrgRole,
   requireUser,
   requireVerifiedUser,
 } from '@/lib/server/auth'
@@ -33,45 +32,6 @@ beforeEach(() => {
       getUser: admin.getUser,
     },
     db: { doc: admin.doc },
-  })
-})
-
-describe('isOrgMember', () => {
-  const org = { name: 'Acme', ownerId: 'u1', members: { u1: { role: 'owner' } } }
-
-  it('is true when members has the uid as an own key', () => {
-    expect(isOrgMember(org, 'u1')).toBe(true)
-  })
-
-  it('is false when the uid is not a member', () => {
-    expect(isOrgMember(org, 'u2')).toBe(false)
-  })
-
-  it('is false for an empty uid', () => {
-    expect(isOrgMember({ members: { '': {} } }, '')).toBe(false)
-  })
-
-  it.each([undefined, null, 'org', 42, true])('is false when orgData is %s', (orgData) => {
-    expect(isOrgMember(orgData, 'u1')).toBe(false)
-  })
-
-  it.each([undefined, null, 'u1', ['u1']])('is false when members is %s', (members) => {
-    expect(isOrgMember({ members }, 'u1')).toBe(false)
-  })
-
-  it('is false for __proto__ (own-key check, no prototype access)', () => {
-    expect(isOrgMember({ members: {} }, '__proto__')).toBe(false)
-    expect(isOrgMember(JSON.parse('{"members":{}}'), '__proto__')).toBe(false)
-  })
-
-  it('is true for a member whose value is null (pins Firestore `uid in members` key semantics)', () => {
-    expect(isOrgMember({ members: { u1: null } }, 'u1')).toBe(true)
-  })
-
-  it('ignores inherited keys', () => {
-    const members = Object.create({ u1: { role: 'owner' } }) as object
-    expect(isOrgMember({ members }, 'u1')).toBe(false)
-    expect(isOrgMember({ members: {} }, 'toString')).toBe(false)
   })
 })
 
@@ -381,49 +341,66 @@ describe('isSessionCookieValid', () => {
   })
 })
 
-function orgSnapshot(data: Record<string, unknown> | undefined) {
+function memberSnapshot(data: Record<string, unknown> | undefined) {
   return { exists: data !== undefined, data: () => data }
 }
 
-describe('requireOrgMember', () => {
-  it('resolves when the user is in organizations/{orgId}.members', async () => {
-    admin.get.mockResolvedValue(orgSnapshot({ ownerId: 'u1', members: { u1: { role: 'owner' } } }))
+describe('requireOrgRole', () => {
+  it.each([
+    ['owner', ['owner']],
+    ['owner', ['owner', 'accountant']],
+    ['accountant', ['owner', 'accountant']],
+    ['viewer', ['owner', 'accountant', 'viewer']],
+  ] as const)('resolves with %s when %j is allowed', async (role, allowed) => {
+    admin.get.mockResolvedValue(memberSnapshot({ uid: 'u1', role }))
 
-    await expect(requireOrgMember('u1', 'org1')).resolves.toBeUndefined()
-    expect(admin.doc).toHaveBeenCalledWith('organizations/org1')
+    await expect(requireOrgRole('u1', 'org1', allowed)).resolves.toBe(role)
+    expect(admin.doc).toHaveBeenCalledWith('organizations/org1/members/u1')
   })
 
-  it('rejects with 403 when the organization does not exist', async () => {
-    admin.get.mockResolvedValue(orgSnapshot(undefined))
+  it('rejects with 403 when the user has no membership document', async () => {
+    admin.get.mockResolvedValue(memberSnapshot(undefined))
 
-    const err = await requireOrgMember('u1', 'missing-org').catch((e: unknown) => e)
-
-    expect(err).toBeInstanceOf(HttpError)
-    expect(err).toMatchObject({ status: 403, message: 'forbidden' })
-  })
-
-  it('rejects with 403 when the user is not a member', async () => {
-    admin.get.mockResolvedValue(orgSnapshot({ ownerId: 'u2', members: { u2: { role: 'owner' } } }))
-
-    const err = await requireOrgMember('u1', 'org1').catch((e: unknown) => e)
+    const err = await requireOrgRole('u1', 'org1', ['owner']).catch((e: unknown) => e)
 
     expect(err).toBeInstanceOf(HttpError)
     expect(err).toMatchObject({ status: 403, message: 'forbidden' })
   })
 
   it.each([
-    ['an empty orgId', ''],
-    ['an orgId that is a path', 'org1/accounts/acc1'],
-    ['".."', '..'],
-    ['"."', '.'],
-    ['a/b', 'a/b'],
-    ['a reserved __x__ id', '__x__'],
-    ['an id with a newline', 'a\nb'],
-    ['a 2000-char id', 'x'.repeat(2000)],
-    ['a non-string', 123 as never],
-    ['null', null as never],
-  ])('rejects %s with 403 without reading Firestore', async (_label, orgId) => {
-    const err = await requireOrgMember('u1', orgId).catch((e: unknown) => e)
+    ['accountant', ['owner']],
+    ['viewer', ['owner', 'accountant']],
+  ] as const)('rejects a %s when only %j is allowed', async (role, allowed) => {
+    admin.get.mockResolvedValue(memberSnapshot({ uid: 'u1', role }))
+
+    const err = await requireOrgRole('u1', 'org1', allowed).catch((e: unknown) => e)
+
+    expect(err).toMatchObject({ status: 403, message: 'forbidden' })
+  })
+
+  it.each([['admin'], [''], [undefined], [null], [7]])('rejects an unknown role %s', async (role) => {
+    admin.get.mockResolvedValue(memberSnapshot({ uid: 'u1', role }))
+
+    const err = await requireOrgRole('u1', 'org1', ['owner', 'accountant', 'viewer']).catch((e: unknown) => e)
+
+    expect(err).toMatchObject({ status: 403, message: 'forbidden' })
+  })
+
+  it.each([
+    ['an empty orgId', 'u1', ''],
+    ['an orgId that is a path', 'u1', 'org1/accounts/acc1'],
+    ['".."', 'u1', '..'],
+    ['"."', 'u1', '.'],
+    ['a reserved __x__ id', 'u1', '__x__'],
+    ['an id with a newline', 'u1', 'a\nb'],
+    ['a 2000-char id', 'u1', 'x'.repeat(2000)],
+    ['a non-string orgId', 'u1', 123 as never],
+    ['null orgId', 'u1', null as never],
+    ['an empty uid', '', 'org1'],
+    ['a uid with a slash', 'a/b', 'org1'],
+    ['a non-string uid', 5 as never, 'org1'],
+  ])('rejects %s with 403 without reading Firestore', async (_label, uid, orgId) => {
+    const err = await requireOrgRole(uid, orgId, ['owner']).catch((e: unknown) => e)
 
     expect(err).toMatchObject({ status: 403, message: 'forbidden' })
     expect(admin.doc).not.toHaveBeenCalled()
@@ -433,7 +410,7 @@ describe('requireOrgMember', () => {
     const outage = new Error('UNAVAILABLE')
     admin.get.mockRejectedValue(outage)
 
-    await expect(requireOrgMember('u1', 'org1')).rejects.toBe(outage)
+    await expect(requireOrgRole('u1', 'org1', ['owner'])).rejects.toBe(outage)
   })
 })
 

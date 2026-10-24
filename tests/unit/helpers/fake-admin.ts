@@ -3,11 +3,35 @@ import { vi } from 'vitest'
 /**
  * In-memory stand-in for getAdmin() from '@/lib/server/firebase-admin'.
  * Route tests mock that module with `{ getAdmin: () => fakeAdmin }`, so the REAL
- * requireUser / requireVerifiedUser / requireOrgMember from '@/lib/server/auth' run against this data.
- * Only `organizations/{orgId}` documents are modelled; both db.doc(path) and
- * db.collection(name).doc(id) access styles are supported.
+ * requireUser / requireVerifiedUser / requireOrgRole from '@/lib/server/auth' run against this data.
+ * `organizations/{orgId}` and `organizations/{orgId}/members/{uid}` documents are modelled; both
+ * db.doc(path) and db.collection(name).doc(id) access styles are supported.
  */
 export const fakeOrgs = new Map<string, Record<string, unknown>>()
+
+/** organizations/{orgId}/members/{uid}, keyed `${orgId}/${uid}`. */
+export const fakeMembers = new Map<string, Record<string, unknown>>()
+
+/** Set `failOnCreatePathIncludes` to make db.runTransaction's tx.create throw for matching paths (atomicity tests). */
+export const fakeTxFault: { failOnCreatePathIncludes: string | null } = { failOnCreatePathIncludes: null }
+
+let autoIdCounter = 0
+const autoId = () => String(++autoIdCounter).padStart(20, '0')
+
+function readPath(path: string): Record<string, unknown> | undefined {
+  const s = path.split('/')
+  if (s[0] !== 'organizations') return undefined
+  if (s.length === 2) return fakeOrgs.get(s[1])
+  if (s.length === 4 && s[2] === 'members') return fakeMembers.get(`${s[1]}/${s[3]}`)
+  return undefined
+}
+
+function writePath(path: string, data: Record<string, unknown>): void {
+  const s = path.split('/')
+  if (s.length === 2) fakeOrgs.set(s[1], data)
+  else if (s.length === 4 && s[2] === 'members') fakeMembers.set(`${s[1]}/${s[3]}`, data)
+  else throw new Error(`fake admin cannot write ${path}`)
+}
 
 /** Accepted credential -> uid. Used for BOTH session-cookie values and ID tokens. */
 export const fakeTokens = new Map<string, string>()
@@ -22,22 +46,28 @@ export const TEST_EB_STATE_SECRET = 'route-test-secret-0123456789abcdef'
 export const TEST_APP_URL = 'https://finflow.test'
 
 function snapshotFor(path: string) {
-  const segments = path.split('/')
-  const data =
-    segments.length === 2 && segments[0] === 'organizations' ? fakeOrgs.get(segments[1]) : undefined
+  const data = readPath(path)
   return {
-    id: segments[segments.length - 1],
+    id: path.split('/').pop() as string,
     exists: data !== undefined,
     data: () => data,
     get: (field: string) => (data === undefined ? undefined : data[field]),
   }
 }
 
-function docRef(path: string) {
+type FakeDocRef = {
+  id: string
+  path: string
+  get: () => Promise<ReturnType<typeof snapshotFor>>
+  collection: (name: string) => { doc: (id?: string) => FakeDocRef }
+}
+
+function docRef(path: string): FakeDocRef {
   return {
-    id: path.split('/').pop(),
+    id: path.split('/').pop() as string,
     path,
     get: async () => snapshotFor(path),
+    collection: (name: string) => ({ doc: (id?: string) => docRef(`${path}/${name}/${id ?? autoId()}`) }),
   }
 }
 
@@ -47,10 +77,43 @@ function invalid(what: string): Error {
   return Object.assign(new Error(`invalid ${what}`), { code: 'auth/argument-error' })
 }
 
+type FakeTx = {
+  get: (q: { group: string; field: string; value: unknown }) => Promise<{
+    docs: Array<{ id: string; get: (field: string) => unknown; data: () => Record<string, unknown> }>
+  }>
+  create: (ref: { path: string }, data: Record<string, unknown>) => void
+}
+
 export const fakeAdmin = {
   db: {
     doc: (path: string) => docRef(path),
-    collection: (name: string) => ({ doc: (id: string) => docRef(`${name}/${id}`) }),
+    collection: (name: string) => ({ doc: (id?: string) => docRef(`${name}/${id ?? autoId()}`) }),
+    // Only the one query shape the app uses: collectionGroup('members').where('uid', '==', value).
+    collectionGroup: (name: string) => ({
+      where: (field: string, _op: '==', value: unknown) => ({ group: name, field, value }),
+    }),
+    // Atomic: creates are staged and applied only if the callback resolves.
+    runTransaction: async <T>(fn: (tx: FakeTx) => Promise<T>): Promise<T> => {
+      const staged: Array<[string, Record<string, unknown>]> = []
+      const tx: FakeTx = {
+        get: async (q) => ({
+          docs: [...fakeMembers.entries()]
+            .filter(([, data]) => q.group === 'members' && data[q.field] === q.value)
+            .map(([key, data]) => ({ id: key.split('/')[1], get: (f: string) => data[f], data: () => data })),
+        }),
+        create: (ref, data) => {
+          const { failOnCreatePathIncludes: fail } = fakeTxFault
+          if (fail !== null && ref.path.includes(fail)) throw new Error('fake transaction failure')
+          if (readPath(ref.path) !== undefined || staged.some(([p]) => p === ref.path)) {
+            throw Object.assign(new Error('already exists'), { code: 6 })
+          }
+          staged.push([ref.path, data])
+        },
+      }
+      const result = await fn(tx)
+      for (const [path, data] of staged) writePath(path, data)
+      return result
+    },
   },
   auth: {
     verifyIdToken: vi.fn(async (token: string) => {
@@ -82,16 +145,21 @@ export const fakeAdmin = {
 /**
  * Resets the fixture:
  *  - alice owns org-acme and has a verified email;
+ *  - carol is an accountant and dave a viewer of org-acme;
  *  - mallory is signed in with a verified email but is not a member of anything;
  *  - bob is signed in but his email is NOT verified.
  * Each user has a credential named token-<name> (works as an ID token and as a session cookie).
  */
 export function resetFakeAdmin(): void {
   fakeOrgs.clear()
+  fakeMembers.clear()
+  fakeTxFault.failOnCreatePathIncludes = null
   fakeTokens.clear()
   fakeUnverified.clear()
   fakeIdTokenAgeSec.clear()
   fakeTokens.set('token-alice', 'user-alice')
+  fakeTokens.set('token-carol', 'user-carol')
+  fakeTokens.set('token-dave', 'user-dave')
   fakeTokens.set('token-mallory', 'user-mallory')
   fakeTokens.set('token-bob', 'user-bob')
   fakeUnverified.add('user-bob')
@@ -100,8 +168,10 @@ export function resetFakeAdmin(): void {
     currency: 'PLN',
     ownerId: 'user-alice',
     plan: 'trial',
-    members: { 'user-alice': { role: 'owner' } },
   })
+  fakeMembers.set('org-acme/user-alice', { uid: 'user-alice', role: 'owner' })
+  fakeMembers.set('org-acme/user-carol', { uid: 'user-carol', role: 'accountant' })
+  fakeMembers.set('org-acme/user-dave', { uid: 'user-dave', role: 'viewer' })
   for (const fn of Object.values(fakeAdmin.auth)) fn.mockReset()
 }
 

@@ -3,6 +3,7 @@ import { getAdmin } from '@/lib/server/firebase-admin'
 import { HttpError } from '@/lib/server/http-error'
 import { assertSameOrigin } from '@/lib/server/request-guards'
 import { readSessionCookie } from '@/lib/server/session-cookie'
+import { isRole, type Role } from '@/lib/shell/permissions'
 
 // Firestore document id allow-list for ids that arrive from the request.
 // Dots are excluded ('.' and '..' are invalid ids); ids matching __.*__ are
@@ -23,17 +24,6 @@ const TOKEN_ERROR_CODES = new Set([
   'auth/user-disabled',
   'auth/user-not-found',
 ])
-
-/**
- * Pure membership check against an organizations/{orgId} document's data.
- * Mirrors the Firestore rule `request.auth.uid in resource.data.members`.
- */
-export function isOrgMember(orgData: unknown, uid: string): boolean {
-  if (!uid || typeof orgData !== 'object' || orgData === null) return false
-  const members: unknown = (orgData as { members?: unknown }).members
-  if (typeof members !== 'object' || members === null || Array.isArray(members)) return false
-  return Object.hasOwn(members, uid)
-}
 
 // firebase-admin 14 reports a failure to fetch Google's signing keys (lib/utils/jwt.js,
 // UrlKeyFetcher.refresh -> token-verifier mapJwtErrorToAuthError) as INVALID_ARGUMENT, i.e.
@@ -150,20 +140,24 @@ export async function isSessionCookieValid(cookie: string): Promise<boolean> {
 }
 
 /**
- * Throws HttpError(403) unless organizations/{orgId} exists and lists uid in
- * its `members` map. Reads with the Admin SDK (bypasses security rules).
- * Temporary until S02 moves membership to its own document.
+ * Returns the caller's role in organizations/{orgId} when it is one of `allowed`; otherwise
+ * throws HttpError(403, 'forbidden') (same answer for "no such company", "not a member" and
+ * "role not allowed", so ids cannot be probed). Reads organizations/{orgId}/members/{uid}
+ * with the Admin SDK (bypasses security rules); a Firestore failure propagates (500).
  */
-export async function requireOrgMember(uid: string, orgId: string): Promise<void> {
-  // orgId comes from the request: allow-list a single plain doc id, otherwise
-  // "org1/accounts/x" would read a different document. Same error as a
-  // non-member so ids cannot be probed.
+export async function requireOrgRole(uid: string, orgId: string, allowed: readonly Role[]): Promise<Role> {
+  // orgId comes from the request: allow-list a single plain doc id, otherwise "org1/accounts/x"
+  // would read a different document. The uid comes from a verified session but is checked too:
+  // it becomes a path segment.
   if (typeof orgId !== 'string' || !ORG_ID.test(orgId) || RESERVED_ID.test(orgId)) {
     throw new HttpError(403, 'forbidden')
   }
-
-  const snap = await getAdmin().db.doc(`organizations/${orgId}`).get()
-  if (!snap.exists || !isOrgMember(snap.data(), uid)) {
+  if (typeof uid !== 'string' || uid.length === 0 || uid.includes('/')) {
     throw new HttpError(403, 'forbidden')
   }
+
+  const snap = await getAdmin().db.doc(`organizations/${orgId}/members/${uid}`).get()
+  const role: unknown = snap.exists ? (snap.data() as { role?: unknown } | undefined)?.role : undefined
+  if (!isRole(role) || !allowed.includes(role)) throw new HttpError(403, 'forbidden')
+  return role
 }
