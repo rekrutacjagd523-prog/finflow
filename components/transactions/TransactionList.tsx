@@ -5,6 +5,7 @@ import { ReceiptText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LazyTransactionForm } from '@/components/forms/lazy'
+import { useShell } from '@/lib/hooks/useShell'
 import { cn } from '@/lib/utils'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/utils/accounts'
 import { formatCurrency } from '@/lib/utils/currency'
@@ -57,6 +58,8 @@ export function TransactionList({
   orgId,
   loading,
 }: TransactionListProps) {
+  const { can } = useShell()
+  const canEdit = can('data.write')
   const [editTx, setEditTx] = useState<Transaction | null>(null)
 
   const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a]))
@@ -138,8 +141,8 @@ export function TransactionList({
                     // the real button in the account cell: the row itself is not a Tab stop.
                     <TableRow
                       key={tx.id}
-                      onClick={() => setEditTx(tx)}
-                      className="cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft"
+                      onClick={canEdit ? () => setEditTx(tx) : undefined}
+                      className={canEdit ? 'cursor-pointer hover:bg-canvas has-[button:focus-visible]:bg-brand-soft' : 'hover:bg-transparent'}
                     >
                       <TableCell className="hidden py-3.5 pl-4 tabular-nums sm:table-cell sm:pl-2">
                         <span className="block text-ink">{formatDayShortUtc(tx.date)}</span>
@@ -152,17 +155,21 @@ export function TransactionList({
                         {/* The account cell is the first cell visible at every width (the date is
                             hidden on a phone), so the row's button lives here. Its name starts with
                             the visible text and adds what tells the rows apart. */}
-                        <button
-                          type="button"
-                          aria-label={`${accountLabel}: ${amountLabel(tx)}, ${formatDayShortUtc(tx.date)}, редагувати`}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setEditTx(tx)
-                          }}
-                          className="block max-w-44 truncate rounded-[4px] text-left text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground sm:max-w-56"
-                        >
-                          {accountLabel}
-                        </button>
+                        {canEdit ? (
+                          <button
+                            type="button"
+                            aria-label={`${accountLabel}: ${amountLabel(tx)}, ${formatDayShortUtc(tx.date)}, редагувати`}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setEditTx(tx)
+                            }}
+                            className="block max-w-44 truncate rounded-[4px] text-left text-ink outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-soft-foreground sm:max-w-56"
+                          >
+                            {accountLabel}
+                          </button>
+                        ) : (
+                          <span className="block max-w-44 truncate text-ink sm:max-w-56">{accountLabel}</span>
+                        )}
                         {/* Second line: the category below md (its column is hidden there), the account type above. */}
                         <span className="block max-w-44 truncate text-xs text-ink-muted md:hidden">{categoryName}</span>
                         <span className="hidden max-w-56 truncate text-xs text-ink-muted md:block">
@@ -196,7 +203,7 @@ export function TransactionList({
         </Table>
       </div>
 
-      {editTx && (
+      {canEdit && editTx && (
         <LazyTransactionForm
           orgId={orgId}
           accounts={accounts}

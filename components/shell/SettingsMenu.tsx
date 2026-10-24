@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { useShell } from '@/lib/hooks/useShell'
-import { SETTINGS_SECTIONS, activeSettingsSection, settingsPath } from '@/lib/shell/settings-sections'
+import { activeSettingsSection, settingsPath, visibleSettingsSections } from '@/lib/shell/settings-sections'
 import { cn } from '@/lib/utils'
 
 const FOCUS = 'focus-visible:outline-2 focus-visible:outline-brand-soft-foreground'
@@ -14,9 +14,10 @@ const FOCUS = 'focus-visible:outline-2 focus-visible:outline-brand-soft-foregrou
 // settings content (settings/layout.tsx, below 1024 px). Only one of them is displayed at a time,
 // so there is always exactly one visible «Розділи налаштувань» landmark.
 export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
-  const { orgId } = useShell()
+  const { orgId, role } = useShell()
   const pathname = usePathname()
   const active = activeSettingsSection(pathname, orgId)
+  const sections = visibleSettingsSections(role)
 
   const back = (
     <Link
@@ -39,7 +40,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
       <div className="space-y-3 lg:hidden">
         {back}
         <nav aria-label="Розділи налаштувань" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
-          {SETTINGS_SECTIONS.map((section) => {
+          {sections.map((section) => {
             const isActive = section.slug === active
             return (
               <Link
@@ -66,7 +67,7 @@ export function SettingsMenu({ variant }: { variant: 'panel' | 'pills' }) {
       {back}
       <p className="mt-4 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Налаштування</p>
       <nav aria-label="Розділи налаштувань" className="flex flex-col gap-0.5">
-        {SETTINGS_SECTIONS.map((section) => {
+        {sections.map((section) => {
           const isActive = section.slug === active
           return (
             <Link

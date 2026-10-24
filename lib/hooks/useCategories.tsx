@@ -11,17 +11,16 @@ interface UseCategoriesResult {
   error: string | null
 }
 
+const EMPTY_CATEGORIES: Category[] = []
+
 export function useCategories(orgId: string | null): UseCategoriesResult {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // The data is stored with the company it belongs to, so a company switch never shows the
+  // previous company's categories while the new subscription waits for its first snapshot.
+  const [snapshot, setSnapshot] = useState<{ orgId: string; categories: Category[] } | null>(null)
+  const [error] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!orgId) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
+    if (!orgId) return
 
     // Seed defaults on first load
     seedDefaultCategories(orgId).catch(() => {
@@ -29,13 +28,16 @@ export function useCategories(orgId: string | null): UseCategoriesResult {
     })
 
     const unsub = getCategories(orgId, (data) => {
-      setCategories(data)
-      setLoading(false)
+      setSnapshot({ orgId, categories: data })
     })
     return () => {
       unsub()
     }
   }, [orgId])
+
+  const current = orgId !== null && snapshot?.orgId === orgId
+  const loading = orgId !== null && !current
+  const categories = current ? snapshot.categories : EMPTY_CATEGORIES
 
   const incomeCategories = categories.filter((c) => c.type === 'income')
   const expenseCategories = categories.filter((c) => c.type === 'expense')

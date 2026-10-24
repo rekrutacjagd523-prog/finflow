@@ -24,7 +24,8 @@ export default function CompanySettingsPage() {
   const params = useParams()
   const orgId = params.orgSlug as string
   // The shell's org is always the URL's org; switchOrg only refreshes it after a save.
-  const { org } = useShell()
+  const { org, can } = useShell()
+  const canEdit = can('company.edit')
   const { switchOrg } = useOrg()
 
   const [name, setName] = useState('')
@@ -40,7 +41,7 @@ export default function CompanySettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!orgId || !name) return
+    if (!canEdit || !orgId || !name) return
     setSaving(true)
     try {
       await updateDoc(doc(db, 'organizations', orgId), { name, currency })
@@ -78,6 +79,7 @@ export default function CompanySettingsPage() {
               onChange={(e) => setName(e.target.value)}
               className="h-9 rounded-control border-line bg-surface"
               required
+              disabled={!canEdit}
             />
           </div>
           <div className="space-y-1.5">
@@ -88,15 +90,20 @@ export default function CompanySettingsPage() {
               onChange={(e) => setCurrency(e.target.value)}
               wrapperClassName="flex w-full"
               className="border-line"
+              disabled={!canEdit}
             >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </NativeSelect>
           </div>
-          <Button type="submit" size="lg" disabled={!isChanged || saving}>
-            {saving ? 'Збереження...' : 'Зберегти'}
-          </Button>
+          {canEdit ? (
+            <Button type="submit" size="lg" disabled={!isChanged || saving}>
+              {saving ? 'Збереження...' : 'Зберегти'}
+            </Button>
+          ) : (
+            <p className="text-xs text-ink-muted">Змінювати дані компанії може лише власник.</p>
+          )}
         </form>
       </CardContent>
     </Card>

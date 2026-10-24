@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 // stays as screen-reader text, so the accessible names never change). From 1024 px the header is
 // three columns, as in Finmap: company on the left, the three equal-width CTAs centred, profile right.
 export function AppHeader() {
-  const { orgId, openTransactionForm, drawerOpen, setDrawerOpen } = useShell()
+  const { orgId, openTransactionForm, drawerOpen, setDrawerOpen, can } = useShell()
   const cta = 'lg:h-10 lg:min-w-32 lg:px-4'
 
   return (
@@ -40,25 +40,29 @@ export function AppHeader() {
           <OrgSwitcher />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
-        <Button size="lg" onClick={() => openTransactionForm('income')} className={cn(cta, 'bg-income text-white hover:bg-income/90')}>
-          <Plus />
-          <span className="sr-only sm:not-sr-only">Дохід</span>
-        </Button>
-        <Button size="lg" onClick={() => openTransactionForm('expense')} className={cn(cta, 'bg-expense text-white hover:bg-expense/90')}>
-          <Minus />
-          <span className="sr-only sm:not-sr-only">Витрата</span>
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={() => openTransactionForm('transfer')}
-          className={cn(cta, 'border-line bg-surface text-ink hover:bg-canvas')}
-        >
-          <ArrowLeftRight />
-          <span className="sr-only sm:not-sr-only">Переказ</span>
-        </Button>
-      </div>
+      {can('data.write') ? (
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
+          <Button size="lg" onClick={() => openTransactionForm('income')} className={cn(cta, 'bg-income text-white hover:bg-income/90')}>
+            <Plus />
+            <span className="sr-only sm:not-sr-only">Дохід</span>
+          </Button>
+          <Button size="lg" onClick={() => openTransactionForm('expense')} className={cn(cta, 'bg-expense text-white hover:bg-expense/90')}>
+            <Minus />
+            <span className="sr-only sm:not-sr-only">Витрата</span>
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => openTransactionForm('transfer')}
+            className={cn(cta, 'border-line bg-surface text-ink hover:bg-canvas')}
+          >
+            <ArrowLeftRight />
+            <span className="sr-only sm:not-sr-only">Переказ</span>
+          </Button>
+        </div>
+      ) : (
+        <div />
+      )}
       <div className="flex shrink-0 items-center justify-end">
         <ProfileMenu />
       </div>

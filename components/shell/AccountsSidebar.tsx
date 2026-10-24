@@ -50,7 +50,10 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
     openAccountForm,
     sidebarCollapsed,
     toggleSidebar,
+    can,
   } = useShell()
+  const canWrite = can('data.write')
+  const canBank = can('bank.manage')
   const collapsed = variant === 'panel' && sidebarCollapsed
   // Only accounts in the company currency; other currencies are not mentioned before S04.
   // Not before both the org and the accounts are loaded: an empty list would show a false 0,00.
@@ -115,16 +118,20 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
             )
           })}
         </ul>
-        <Button variant="soft" size="icon-sm" onClick={handleAdd} aria-label="Додати рахунок">
-          <Plus />
-        </Button>
-        <Link
-          href={settingsPath(orgId, 'banks')}
-          aria-label="Підключити банк"
-          className="flex size-7 items-center justify-center rounded-control text-brand-soft-foreground hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
-        >
-          <Building2 className="size-4" />
-        </Link>
+        {canWrite && (
+          <Button variant="soft" size="icon-sm" onClick={handleAdd} aria-label="Додати рахунок">
+            <Plus />
+          </Button>
+        )}
+        {canBank && (
+          <Link
+            href={settingsPath(orgId, 'banks')}
+            aria-label="Підключити банк"
+            className="flex size-7 items-center justify-center rounded-control text-brand-soft-foreground hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
+          >
+            <Building2 className="size-4" />
+          </Link>
+        )}
       </div>
     )
   }
@@ -180,15 +187,17 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
       <div className="flex-1 overflow-y-auto border-t border-line px-2 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2 pr-1 pb-1 pl-3">
           <h2 className="text-sm font-semibold text-ink">Мої рахунки</h2>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleAdd}
-            aria-label="Додати рахунок"
-            className="text-brand-soft-foreground hover:bg-brand-soft hover:text-brand-soft-foreground"
-          >
-            <Plus />
-          </Button>
+          {canWrite && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleAdd}
+              aria-label="Додати рахунок"
+              className="text-brand-soft-foreground hover:bg-brand-soft hover:text-brand-soft-foreground"
+            >
+              <Plus />
+            </Button>
+          )}
         </div>
 
         <button type="button" onClick={() => choose(null)} aria-pressed={selectedAccountId === null} className={rowClass(selectedAccountId === null)}>
@@ -223,26 +232,28 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
                       {formatCurrency(account.balance, account.currency)}
                     </span>
                   </button>
-                  <DropdownMenu>
-                    {/* Shown on hover or keyboard focus of the row (and while its menu is open);
-                        always shown on touch screens, which have no hover. */}
-                    <DropdownMenuTrigger
-                      aria-label={`Дії з рахунком ${account.name}`}
-                      className="flex size-7 shrink-0 items-center justify-center rounded-control text-ink-muted opacity-0 transition-[opacity,color,background-color] group-hover/row:opacity-100 group-focus-within/row:opacity-100 hover:bg-canvas hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-brand-soft-foreground data-popup-open:opacity-100 [@media(hover:none)]:opacity-100"
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-44">
-                      <DropdownMenuItem onClick={() => handleEdit(account)}>
-                        <Pencil />
-                        Редагувати
-                      </DropdownMenuItem>
-                      <DropdownMenuItem variant="destructive" onClick={() => void handleDelete(account)}>
-                        <Trash2 />
-                        Видалити
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {canWrite && (
+                    <DropdownMenu>
+                      {/* Shown on hover or keyboard focus of the row (and while its menu is open);
+                          always shown on touch screens, which have no hover. */}
+                      <DropdownMenuTrigger
+                        aria-label={`Дії з рахунком ${account.name}`}
+                        className="flex size-7 shrink-0 items-center justify-center rounded-control text-ink-muted opacity-0 transition-[opacity,color,background-color] group-hover/row:opacity-100 group-focus-within/row:opacity-100 hover:bg-canvas hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-brand-soft-foreground data-popup-open:opacity-100 [@media(hover:none)]:opacity-100"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onClick={() => handleEdit(account)}>
+                          <Pencil />
+                          Редагувати
+                        </DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive" onClick={() => void handleDelete(account)}>
+                          <Trash2 />
+                          Видалити
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </li>
               )
             })}
@@ -250,17 +261,19 @@ export function AccountsSidebar({ variant = 'panel', onNavigate, headerAction }:
         )}
 
         {/* Right under the list (as in Finmap), not pinned to the bottom of the column. */}
-        <Link
-          href={settingsPath(orgId, 'banks')}
-          onClick={onNavigate}
-          className="mx-1 mt-3 flex items-center gap-3 rounded-field border border-dashed border-line px-3 py-2.5 transition-colors hover:border-brand hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
-        >
-          <Building2 className="size-4 shrink-0 text-brand-soft-foreground" />
-          <span className="min-w-0">
-            <span className="block text-sm font-medium text-ink">Підключити банк</span>
-            <span className="block text-xs text-ink-muted">Open Banking, бета</span>
-          </span>
-        </Link>
+        {canBank && (
+          <Link
+            href={settingsPath(orgId, 'banks')}
+            onClick={onNavigate}
+            className="mx-1 mt-3 flex items-center gap-3 rounded-field border border-dashed border-line px-3 py-2.5 transition-colors hover:border-brand hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand-soft-foreground"
+          >
+            <Building2 className="size-4 shrink-0 text-brand-soft-foreground" />
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-ink">Підключити банк</span>
+              <span className="block text-xs text-ink-muted">Open Banking, бета</span>
+            </span>
+          </Link>
+        )}
       </div>
     </div>
   )
