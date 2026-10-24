@@ -17,7 +17,8 @@ import {
 } from '@/components/ui/select'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useOrg } from '@/lib/hooks/useOrg'
-import { createOrganization, getUserOrganizations } from '@/lib/firebase/firestore'
+import { getMyOrganizations } from '@/lib/firebase/members'
+import { createOrgViaApi } from '@/lib/firebase/orgs-client'
 
 const CURRENCIES = [
   { value: 'UAH', label: 'UAH — Ukrainian Hryvnia' },
@@ -75,12 +76,12 @@ export default function RegisterPage() {
     setLoading(true)
     try {
       const { user } = await signInGoogle()
-      const existingOrgs = await getUserOrganizations(user.uid)
+      const existingOrgs = await getMyOrganizations(user.uid)
       if (existingOrgs.length > 0) {
         await goToOrg(existingOrgs[0].id)
         return
       }
-      const orgId = await createOrganization(user.uid, orgName, currency)
+      const orgId = await createOrgViaApi(orgName, currency)
       await goToOrg(orgId)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Google registration failed'

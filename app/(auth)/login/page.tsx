@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { getUserOrganizations } from '@/lib/firebase/firestore'
+import { getMyOrganizations } from '@/lib/firebase/members'
 import { safeRedirectPath } from '@/lib/auth/paths'
 
 export default function LoginPage() {
@@ -26,7 +26,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const user = await signIn(email, password)
-      const orgs = await getUserOrganizations(user.uid)
+      const orgs = await getMyOrganizations(user.uid)
       if (orgs.length > 0) {
         const target = safeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
         router.push(target ?? `/${orgs[0].id}/transactions`)
@@ -45,7 +45,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const { user } = await signInGoogle()
-      const orgs = await getUserOrganizations(user.uid)
+      const orgs = await getMyOrganizations(user.uid)
       if (orgs.length > 0) {
         const target = safeRedirectPath(new URLSearchParams(window.location.search).get('redirect'))
         router.push(target ?? `/${orgs[0].id}/transactions`)

@@ -1,3 +1,5 @@
+import type { Role } from '@/lib/shell/permissions'
+
 export interface Organization {
   id: string
   name: string
@@ -12,7 +14,7 @@ export interface OrgMember {
   uid: string
   name: string
   email: string
-  role: 'owner' | 'admin' | 'editor' | 'viewer'
+  role: Role
 }
 
 export interface Account {

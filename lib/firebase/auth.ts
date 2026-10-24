@@ -11,7 +11,7 @@ import {
   type User,
 } from 'firebase/auth'
 import { auth } from './firebase'
-import { createOrganization } from './firestore'
+import { createOrgViaApi } from './orgs-client'
 import { clearSession, establishSession } from './session'
 
 const googleProvider = new GoogleAuthProvider()
@@ -44,7 +44,7 @@ export async function signUpWithEmail(
   await sendEmailVerification(user).catch(() => {})
   await updateProfile(user, { displayName: name })
 
-  const orgId = await createOrganization(user.uid, orgName, currency)
+  const orgId = await createOrgViaApi(orgName, currency)
 
   return { user, orgId }
 }

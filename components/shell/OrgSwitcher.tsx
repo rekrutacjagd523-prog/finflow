@@ -10,7 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { getUserOrganizations } from '@/lib/firebase/firestore'
+import { getMyOrganizations } from '@/lib/firebase/members'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useShell } from '@/lib/hooks/useShell'
 import type { Organization } from '@/types'
@@ -31,7 +31,7 @@ export function OrgSwitcher() {
     if (!user) return
     setList({ status: 'loading' })
     try {
-      setList({ status: 'ready', orgs: await getUserOrganizations(user.uid) })
+      setList({ status: 'ready', orgs: await getMyOrganizations(user.uid) })
     } catch {
       setList({ status: 'error' })
     }
