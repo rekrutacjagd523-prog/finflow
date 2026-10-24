@@ -39,12 +39,15 @@ export default function CompanySettingsPage() {
     }
   }, [org])
 
+  // The name is saved trimmed (the rules also refuse a blank one); a blank name is not a valid change.
+  const trimmedName = name.trim()
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!canEdit || !orgId || !name) return
+    if (!canEdit || !orgId || trimmedName.length === 0) return
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'organizations', orgId), { name, currency })
+      await updateDoc(doc(db, 'organizations', orgId), { name: trimmedName, currency })
     } catch {
       toast.error('Помилка збереження')
       setSaving(false)
@@ -61,7 +64,7 @@ export default function CompanySettingsPage() {
     setSaving(false)
   }
 
-  const isChanged = org && (name !== org.name || currency !== org.currency)
+  const isChanged = org && trimmedName.length > 0 && (trimmedName !== org.name || currency !== org.currency)
 
   return (
     <Card className="ring-line">
@@ -79,6 +82,7 @@ export default function CompanySettingsPage() {
               onChange={(e) => setName(e.target.value)}
               className="h-9 rounded-control border-line bg-surface"
               required
+              maxLength={120}
               disabled={!canEdit}
             />
           </div>

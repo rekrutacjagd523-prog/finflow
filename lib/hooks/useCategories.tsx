@@ -13,7 +13,15 @@ interface UseCategoriesResult {
 
 const EMPTY_CATEGORIES: Category[] = []
 
-export function useCategories(orgId: string | null): UseCategoriesResult {
+interface UseCategoriesOptions {
+  /**
+   * Create the default categories when the company has none. Only a caller who may write data can
+   * (the rules refuse everyone else), so a viewer passes false and never even tries.
+   */
+  seed?: boolean
+}
+
+export function useCategories(orgId: string | null, { seed = true }: UseCategoriesOptions = {}): UseCategoriesResult {
   // The data is stored with the company it belongs to, so a company switch never shows the
   // previous company's categories while the new subscription waits for its first snapshot.
   const [snapshot, setSnapshot] = useState<{ orgId: string; categories: Category[] } | null>(null)
@@ -23,9 +31,11 @@ export function useCategories(orgId: string | null): UseCategoriesResult {
     if (!orgId) return
 
     // Seed defaults on first load
-    seedDefaultCategories(orgId).catch(() => {
-      // silently ignore if already seeded
-    })
+    if (seed) {
+      seedDefaultCategories(orgId).catch(() => {
+        // silently ignore if already seeded
+      })
+    }
 
     const unsub = getCategories(orgId, (data) => {
       setSnapshot({ orgId, categories: data })
@@ -33,7 +43,7 @@ export function useCategories(orgId: string | null): UseCategoriesResult {
     return () => {
       unsub()
     }
-  }, [orgId])
+  }, [orgId, seed])
 
   const current = orgId !== null && snapshot?.orgId === orgId
   const loading = orgId !== null && !current

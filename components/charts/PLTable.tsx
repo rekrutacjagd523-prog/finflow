@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useShell } from '@/lib/hooks/useShell'
 import { PLRow } from '@/lib/utils/analytics'
 import { cn } from '@/lib/utils'
 
@@ -54,6 +55,7 @@ function TableSkeleton({ cols }: { cols: number }) {
 
 export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
+  const { can } = useShell()
   if (loading) return <TableSkeleton cols={monthKeys.length} />
 
   const incomeRows = rows.filter(r => r.type === 'income')
@@ -69,9 +71,11 @@ export default function PLTable({ rows, monthKeys, loading }: PLTableProps) {
     return (
       <div className="rounded-xl border border-line flex flex-col items-center justify-center gap-2 py-16">
         <p className="text-ink-muted">Немає даних за цей період</p>
-        <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
-          Додати транзакції →
-        </Link>
+        {can('data.write') && (
+          <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
+            Додати транзакції →
+          </Link>
+        )}
       </div>
     )
   }

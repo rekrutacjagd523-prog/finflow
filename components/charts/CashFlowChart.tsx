@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useShell } from '@/lib/hooks/useShell'
 import type { CashFlowBucket } from '@/lib/utils/analytics'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 
@@ -82,6 +83,7 @@ function ChartSkeleton() {
 
 export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
+  const { can } = useShell()
 
   if (loading) return <ChartSkeleton />
 
@@ -89,9 +91,11 @@ export default function CashFlowChart({ data, loading }: CashFlowChartProps) {
     return (
       <div className="w-full h-[400px] rounded-xl border border-line flex flex-col items-center justify-center gap-2">
         <p className="text-ink-muted">Немає даних за цей період</p>
-        <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
-          Додати транзакції →
-        </Link>
+        {can('data.write') && (
+          <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
+            Додати транзакції →
+          </Link>
+        )}
       </div>
     )
   }
