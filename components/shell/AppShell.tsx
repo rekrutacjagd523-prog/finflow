@@ -9,6 +9,7 @@ import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui
 import { AccountsSidebar } from '@/components/shell/AccountsSidebar'
 import { AppHeader } from '@/components/shell/AppHeader'
 import { ModuleTabs } from '@/components/shell/ModuleTabs'
+import { NoAccess } from '@/components/shell/NoAccess'
 import { SettingsMenu } from '@/components/shell/SettingsMenu'
 import { useShell } from '@/lib/hooks/useShell'
 import { isSettingsPath } from '@/lib/shell/settings-sections'
@@ -18,7 +19,7 @@ import { isSettingsPath } from '@/lib/shell/settings-sections'
 // Settings are a separate screen (as in Finmap): there the left column holds the settings menu
 // instead of the accounts and the module tabs are hidden; the header stays.
 export function AppShell({ children }: { children: ReactNode }) {
-  const { orgId, drawerOpen, setDrawerOpen } = useShell()
+  const { orgId, access, drawerOpen, setDrawerOpen } = useShell()
   const inSettings = isSettingsPath(usePathname(), orgId)
 
   // The drawer only exists below the `lg` breakpoint: close it when the window grows past it
@@ -33,6 +34,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => query.removeEventListener('change', onChange)
   }, [setDrawerOpen])
 
+  // No membership (or it could not be checked): the whole shell is replaced by the No access screen.
+  if (access.status === 'denied' || access.status === 'error') return <NoAccess variant={access.status} />
+  // While access is loading the header stays (so the company switcher does not blink); the
+  // company's data (sidebar, tabs, page) renders only once access is granted.
+  const granted = access.status === 'granted'
+
   return (
     // `isolate`: the shell is one stacking context, so its inner z-indices (the sticky module tabs'
     // z-10) cannot compete with the menus, selects and dialogs portalled to <body> after it. Even a
@@ -43,19 +50,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden border-t border-line bg-surface lg:rounded-panel lg:border lg:shadow-panel">
           {inSettings ? (
             <aside aria-label="Налаштування" className="hidden shrink-0 lg:flex">
-              <SettingsMenu variant="panel" />
+              {granted && <SettingsMenu variant="panel" />}
             </aside>
           ) : (
             <aside aria-label="Рахунки" className="hidden shrink-0 lg:flex">
-              <AccountsSidebar />
+              {granted && <AccountsSidebar />}
             </aside>
           )}
           {/* The content column scrolls as a whole: the module tabs stay pinned at its top (sticky),
               the verification banner scrolls away, and <main> holds only the page. */}
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-            {!inSettings && <ModuleTabs />}
+            {granted && !inSettings && <ModuleTabs />}
             <VerifyEmailBanner />
-            <main className="min-w-0 flex-1">{children}</main>
+            <main className="min-w-0 flex-1">
+              {granted ? children : <div data-testid="shell-loading" className="h-full animate-pulse bg-canvas/40" aria-busy />}
+            </main>
           </div>
         </div>
       </div>
@@ -67,16 +76,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="top-0 left-0 flex h-dvh max-h-dvh w-80 max-w-[calc(100%-3rem)] translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-r-panel p-0 duration-200 sm:max-w-[calc(100%-3rem)] lg:hidden data-open:zoom-in-100 data-open:slide-in-from-left data-closed:zoom-out-100 data-closed:slide-out-to-left motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none"
         >
           <DialogTitle className="sr-only">Рахунки</DialogTitle>
-          <AccountsSidebar
-            variant="drawer"
-            onNavigate={() => setDrawerOpen(false)}
-            headerAction={
-              // A visible way out besides Esc and the backdrop; Base UI returns focus to «☰».
-              <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label="Закрити" />}>
-                <X />
-              </DialogClose>
-            }
-          />
+          {granted && (
+            <AccountsSidebar
+              variant="drawer"
+              onNavigate={() => setDrawerOpen(false)}
+              headerAction={
+                // A visible way out besides Esc and the backdrop; Base UI returns focus to «☰».
+                <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label="Закрити" />}>
+                  <X />
+                </DialogClose>
+              }
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

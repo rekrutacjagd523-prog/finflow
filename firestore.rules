@@ -1,17 +1,20 @@
 rules_version = '2';
 
-// FinFlow Firestore security rules (S00).
+// FinFlow Firestore security rules (S02).
 //
-// Deny by default: any path that no `match` block below allows is closed to
-// web/mobile clients. Server code (firebase-admin in lib/server) bypasses these
-// rules entirely.
+// Deny by default: any path that no `match` block below allows is closed to web/mobile
+// clients. Server code (firebase-admin in lib/server) bypasses these rules entirely.
 //
-// Data shape (lib/firebase/firestore.ts#createOrganization):
-//   organizations/{orgId} {
-//     name, currency, ownerId, plan, trialEndsAt, createdAt,
-//     members: { <uid>: { role: 'owner' } }
-//   }
+// Access is decided by a membership document:
+//   organizations/{orgId}/members/{uid} = { uid, role: 'owner'|'accountant'|'viewer', createdAt, addedBy }
+// Only the server writes organizations and memberships (POST /api/orgs, migration script).
+//
+// Data shape:
+//   organizations/{orgId} { name, currency, ownerId, plan, trialEndsAt, createdAt }
 //   organizations/{orgId}/{accounts|categories|transactions|bankConnections}/{docId}
+//
+// The name `members` is reserved for memberships: the collection-group rule below applies to
+// every collection called `members`. New subcollections must be added to the lists below.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -19,39 +22,22 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // True when the caller's uid is a key of the org's `members` map.
-    function isMemberOf(org) {
-      return isSignedIn() && request.auth.uid in org.members;
+    function memberPath(orgId) {
+      return /databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid);
     }
 
-    function orgData(orgId) {
-      return get(/databases/$(database)/documents/organizations/$(orgId)).data;
-    }
-
-    // Exactly what createOrganization writes: the caller is the only member and
-    // the owner, the plan is a trial of at most 14 days (+1 day clock skew).
-    function isValidNewOrg() {
-      let org = request.resource.data;
+    // The caller has a membership document in the org and its role is one of `roles`.
+    // exists() + get() of the same document is one read.
+    function hasRole(orgId, roles) {
       return isSignedIn()
-        && request.auth.token.firebase.sign_in_provider != 'anonymous'
-        && org.keys().hasOnly(['name', 'currency', 'ownerId', 'plan', 'trialEndsAt', 'createdAt', 'members'])
-        && org.ownerId == request.auth.uid
-        && org.members is map
-        && org.members.keys().hasOnly([request.auth.uid])
-        && org.members[request.auth.uid] == {'role': 'owner'}
-        && org.plan == 'trial'
-        && org.trialEndsAt is timestamp
-        && org.trialEndsAt <= request.time + duration.value(15, 'd')
-        && orgFieldsValid(org)
-        && org.createdAt is timestamp
-        && org.createdAt >= request.time - duration.value(1, 'd')
-        && org.createdAt <= request.time + duration.value(1, 'd');
+        && exists(memberPath(orgId))
+        && get(memberPath(orgId)).data.role in roles;
     }
 
-    // Type and size checks for the fields a member may edit (and the creator sets).
+    // Type and size checks for the fields the owner may edit.
     function orgFieldsValid(o) {
-      return o.name is string && o.name.size() > 0 && o.name.size() <= 120
-        && o.currency is string && o.currency.size() == 3;
+      return o.name is string && o.name.trim().size() > 0 && o.name.size() <= 120
+        && o.currency is string && o.currency in ['PLN', 'EUR', 'USD', 'UAH'];
     }
 
     // A subcollection document may carry an `orgId`, but only its own org's.
@@ -60,33 +46,44 @@ service cloud.firestore {
     }
 
     match /organizations/{orgId} {
-      allow get: if isMemberOf(resource.data);
+      // Any member may read the company. There is no `list` (companies are loaded by id from
+      // the caller's memberships), no client `create` and no `delete`.
+      allow get: if hasRole(orgId, ['owner', 'accountant', 'viewer']);
 
-      // Rules are not filters: a query is allowed only if it can never return
-      // an org the caller is not a member of. The client query
-      // where(`members.${uid}.role`, '!=', null) (lib/firebase/queries.ts)
-      // satisfies this; an unfiltered query or one on another uid is denied.
-      allow list: if isSignedIn() && resource.data.members[request.auth.uid].role != null;
-
-      allow create: if isValidNewOrg();
-
-      // Allow-list: a member may change only name and currency (the settings
-      // page). Everything else (membership, ownership, billing, createdAt and
-      // any unknown field) is closed, and the editable fields stay well-typed.
-      allow update: if isMemberOf(resource.data)
+      // Allow-list: the owner may change only name and currency (settings page). Everything
+      // else (ownerId, plan, trial, createdAt, any unknown field) is closed.
+      allow update: if hasRole(orgId, ['owner'])
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'currency'])
         && orgFieldsValid(request.resource.data);
 
-      allow delete: if false;
+      // Memberships are written by the server only.
+      match /members/{memberId} {
+        allow get: if isSignedIn() && (request.auth.uid == memberId || hasRole(orgId, ['owner']));
+        allow list: if hasRole(orgId, ['owner']);
+      }
 
       match /{subcollection}/{docId} {
-        allow read, delete: if subcollection in ['accounts', 'categories', 'transactions', 'bankConnections']
-          && isMemberOf(orgData(orgId));
+        allow read: if (subcollection in ['accounts', 'categories', 'transactions']
+            && hasRole(orgId, ['owner', 'accountant', 'viewer']))
+          || (subcollection == 'bankConnections' && hasRole(orgId, ['owner']));
 
-        allow create, update: if subcollection in ['accounts', 'categories', 'transactions', 'bankConnections']
-          && isMemberOf(orgData(orgId))
-          && orgIdMatchesPath(orgId);
+        allow create, update: if (subcollection in ['accounts', 'categories', 'transactions']
+            && hasRole(orgId, ['owner', 'accountant'])
+            && orgIdMatchesPath(orgId))
+          || (subcollection == 'bankConnections'
+            && hasRole(orgId, ['owner'])
+            && orgIdMatchesPath(orgId));
+
+        allow delete: if (subcollection in ['accounts', 'categories', 'transactions']
+            && hasRole(orgId, ['owner', 'accountant']))
+          || (subcollection == 'bankConnections' && hasRole(orgId, ['owner']));
       }
+    }
+
+    // "My companies": collectionGroup('members').where('uid', '==', <my uid>). A rule is not a
+    // filter, so the query must constrain `uid` to the caller's own uid.
+    match /{path=**}/members/{memberId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
     // Server-only documents (e.g. _meta/health read by GET /api/health).

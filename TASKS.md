@@ -11,7 +11,7 @@
 - [ ] `/lib/hooks/useAuth.ts` — auth context + hook
 - [ ] `/app/(auth)/login/page.tsx` — форма логіну
 - [ ] `/app/(auth)/register/page.tsx` — форма реєстрації + create org
-- [ ] `/lib/firebase/firestore.ts` — createOrganization, getOrganization
+- [ ] `/lib/firebase/firestore.ts` — getOrganization (компанію створює сервер: `POST /api/orgs` через `createOrgViaApi`, S02)
 - [ ] `/lib/hooks/useOrg.ts` — org context
 - [ ] Middleware — захист маршрутів `/app/(app)/[orgSlug]`
 - [ ] `/app/(app)/[orgSlug]/settings/page.tsx` — налаштування орг.

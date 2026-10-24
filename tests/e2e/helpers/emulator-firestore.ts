@@ -5,7 +5,7 @@ const PROJECT = 'demo-finflow'
 export type Plain = string | number | boolean | null | Date | Plain[] | { [key: string]: Plain }
 export type SeedFields = { [key: string]: Plain | undefined }
 
-type FirestoreValue =
+export type FirestoreValue =
   | { nullValue: null }
   | { booleanValue: boolean }
   | { doubleValue: number }
@@ -54,4 +54,46 @@ export async function seedDoc(
     data: { fields: toFields(data) },
   })
   if (!res.ok()) throw new Error(`seed ${collectionPath}/${docId} failed: ${res.status()} ${await res.text()}`)
+}
+
+/** Reads a document as admin. Returns its raw Firestore `fields`, or null when it does not exist. */
+export async function readDoc(
+  request: APIRequestContext,
+  path: string,
+): Promise<Record<string, FirestoreValue> | null> {
+  const url = `http://${firestoreHost()}/v1/projects/${PROJECT}/databases/(default)/documents/${path}`
+  const res = await request.get(url, { headers: { Authorization: 'Bearer owner' } })
+  if (res.status() === 404) return null
+  if (!res.ok()) throw new Error(`read ${path} failed: ${res.status()} ${await res.text()}`)
+  return ((await res.json()) as { fields?: Record<string, FirestoreValue> }).fields ?? {}
+}
+
+/** Creates organizations/{orgId}/members/{uid} as admin (the server's job in the real app). */
+export async function seedMember(
+  request: APIRequestContext,
+  orgId: string,
+  uid: string,
+  role: 'owner' | 'accountant' | 'viewer',
+  addedBy = uid,
+): Promise<void> {
+  await seedDoc(request, `organizations/${orgId}/members`, uid, { uid, role, createdAt: new Date(), addedBy })
+}
+
+/**
+ * Writes a document through the Firestore REST API as a signed-in user (their ID token), so the
+ * security rules apply. Returns the HTTP status: 200 allowed, 403 denied by the rules.
+ */
+export async function createDocAs(
+  request: APIRequestContext,
+  idToken: string,
+  collectionPath: string,
+  docId: string,
+  data: SeedFields,
+): Promise<number> {
+  const url = `http://${firestoreHost()}/v1/projects/${PROJECT}/databases/(default)/documents/${collectionPath}?documentId=${encodeURIComponent(docId)}`
+  const res = await request.post(url, {
+    headers: { Authorization: `Bearer ${idToken}` },
+    data: { fields: toFields(data) },
+  })
+  return res.status()
 }

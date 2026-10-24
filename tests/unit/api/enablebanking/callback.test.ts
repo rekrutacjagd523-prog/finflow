@@ -76,6 +76,14 @@ describe('GET /api/enablebanking/callback', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('returns 403 when the user in the state is an accountant (bank connections are owner-only), before exchanging the code', async () => {
+    const state = signEbState({ orgId: 'org-acme', uid: 'user-carol' }, TEST_EB_STATE_SECRET)
+    const res = await GET(callbackRequest({ code: 'auth-code', state }, 'token-carol'))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('returns 400 for a forged state even without a session (state is verified first)', async () => {
     const forged = signEbState({ orgId: 'org-acme', uid: 'user-alice' }, 'attacker-secret')
     const res = await GET(callbackRequest({ code: 'auth-code', state: forged }, null))

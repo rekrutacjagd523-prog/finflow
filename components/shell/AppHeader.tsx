@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ArrowLeftRight, Menu, Minus, Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { OrgSwitcher } from '@/components/shell/OrgSwitcher'
 import { ProfileMenu } from '@/components/shell/ProfileMenu'
 import { useShell } from '@/lib/hooks/useShell'
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 // stays as screen-reader text, so the accessible names never change). From 1024 px the header is
 // three columns, as in Finmap: company on the left, the three equal-width CTAs centred, profile right.
 export function AppHeader() {
-  const { orgId, openTransactionForm, drawerOpen, setDrawerOpen } = useShell()
+  const { orgId, openTransactionForm, drawerOpen, setDrawerOpen, can, access } = useShell()
   const cta = 'lg:h-10 lg:min-w-32 lg:px-4'
 
   return (
@@ -40,25 +40,39 @@ export function AppHeader() {
           <OrgSwitcher />
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
-        <Button size="lg" onClick={() => openTransactionForm('income')} className={cn(cta, 'bg-income text-white hover:bg-income/90')}>
-          <Plus />
-          <span className="sr-only sm:not-sr-only">Дохід</span>
-        </Button>
-        <Button size="lg" onClick={() => openTransactionForm('expense')} className={cn(cta, 'bg-expense text-white hover:bg-expense/90')}>
-          <Minus />
-          <span className="sr-only sm:not-sr-only">Витрата</span>
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={() => openTransactionForm('transfer')}
-          className={cn(cta, 'border-line bg-surface text-ink hover:bg-canvas')}
-        >
-          <ArrowLeftRight />
-          <span className="sr-only sm:not-sr-only">Переказ</span>
-        </Button>
-      </div>
+      {access.status === 'loading' ? (
+        // Access is still loading: keep the group's space (same sizes, so the header does not jump)
+        // but render nothing clickable or readable. Plain empty spans, hidden from the accessibility
+        // tree and from focus. The sm widths approximate the labelled buttons; from lg the min-width is exact.
+        <div aria-hidden className="invisible flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
+          {['sm:w-[5.25rem]', 'sm:w-[6.25rem]', 'sm:w-[6.25rem]'].map((width, i) => (
+            <span key={i} className={cn(buttonVariants({ size: 'lg' }), cta, 'w-9 px-0', width, 'lg:w-auto')} />
+          ))}
+        </div>
+      ) : can('data.write') ? (
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2 lg:gap-3">
+          <Button size="lg" onClick={() => openTransactionForm('income')} className={cn(cta, 'bg-income text-white hover:bg-income/90')}>
+            <Plus />
+            <span className="sr-only sm:not-sr-only">Дохід</span>
+          </Button>
+          <Button size="lg" onClick={() => openTransactionForm('expense')} className={cn(cta, 'bg-expense text-white hover:bg-expense/90')}>
+            <Minus />
+            <span className="sr-only sm:not-sr-only">Витрата</span>
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => openTransactionForm('transfer')}
+            className={cn(cta, 'border-line bg-surface text-ink hover:bg-canvas')}
+          >
+            <ArrowLeftRight />
+            <span className="sr-only sm:not-sr-only">Переказ</span>
+          </Button>
+        </div>
+      ) : (
+        // A viewer (or no access): the empty slot keeps the three-column header grid.
+        <div />
+      )}
       <div className="flex shrink-0 items-center justify-end">
         <ProfileMenu />
       </div>

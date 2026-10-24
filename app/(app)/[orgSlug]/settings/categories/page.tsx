@@ -26,7 +26,8 @@ const CATEGORY_COLORS = [
 export default function CategoriesSettingsPage() {
   const params = useParams()
   const orgId = params.orgSlug as string
-  const { incomeCategories, expenseCategories } = useShell()
+  const { incomeCategories, expenseCategories, can } = useShell()
+  const canEdit = can('data.write')
 
   const [newCatName, setNewCatName] = useState('')
   const [newCatType, setNewCatType] = useState<'income' | 'expense'>('income')
@@ -78,14 +79,16 @@ export default function CategoriesSettingsPage() {
                   <div key={cat.id} className="group flex items-center gap-2">
                     <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
                     <span className="flex-1 text-sm text-ink">{cat.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCategory(cat)}
-                      aria-label={`Видалити категорію ${cat.name}`}
-                      className="text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-expense focus-visible:opacity-100"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(cat)}
+                        aria-label={`Видалити категорію ${cat.name}`}
+                        className="text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-expense focus-visible:opacity-100"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -93,6 +96,7 @@ export default function CategoriesSettingsPage() {
           </div>
         ))}
 
+        {canEdit && (
         <div className="border-t border-line pt-4">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Додати категорію</p>
           <form onSubmit={handleAddCategory} className="space-y-3">
@@ -136,6 +140,7 @@ export default function CategoriesSettingsPage() {
             </Button>
           </form>
         </div>
+        )}
       </CardContent>
     </Card>
   )

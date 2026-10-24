@@ -70,6 +70,16 @@ describe('GET /api/enablebanking/accounts', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['accountant', 'token-carol'],
+    ['viewer', 'token-dave'],
+  ])('returns 403 for a %s (bank connections are owner-only)', async (_role, token) => {
+    const res = await GET(accountsRequest({ sessionId: SESSION_ID, orgId: 'org-acme' }, token))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('keeps the existing upstream call and returns { accounts }', async () => {
     fetchMock.mockResolvedValueOnce(upstreamJson({ accounts: ['497f6eca-6276-4993-bfeb-53cbbbba6f08'] }))
 

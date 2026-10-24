@@ -1,0 +1,64 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { getMyOrganizations } from '@/lib/firebase/members'
+import { useAuth } from '@/lib/hooks/useAuth'
+import { useShell } from '@/lib/hooks/useShell'
+import type { Organization } from '@/types'
+
+// Shown instead of the whole shell when the URL's company is not the caller's ("denied": no
+// membership) or when access could not be checked ("error"). Replaces the endless skeleton.
+export function NoAccess({ variant }: { variant: 'denied' | 'error' }) {
+  const { user, signOut } = useAuth()
+  const { chooseOrg } = useShell()
+  const [mine, setMine] = useState<Organization | null>(null)
+  const uid = user?.uid
+
+  useEffect(() => {
+    if (!uid || variant !== 'denied') return
+    let cancelled = false
+    getMyOrganizations(uid).then(
+      (orgs) => {
+        if (!cancelled) setMine(orgs[0] ?? null)
+      },
+      () => {},
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [uid, variant])
+
+  const denied = variant === 'denied'
+
+  return (
+    <div className="app-shell isolate flex min-h-dvh items-center justify-center bg-canvas p-6 text-ink">
+      <div data-testid="no-access" className="w-full max-w-md rounded-panel border border-line bg-surface p-8 text-center shadow-panel">
+        <h1 className="font-display text-xl font-semibold text-ink">
+          {denied ? 'Немає доступу до цієї компанії' : 'Не вдалося перевірити доступ'}
+        </h1>
+        <p className="mt-2 text-sm text-ink-muted">
+          {denied
+            ? 'Ця компанія не належить вашому обліковому запису, або її не існує.'
+            : 'Перевірте з’єднання та спробуйте ще раз.'}
+        </p>
+        <div className="mt-6 flex flex-col gap-2">
+          {denied && mine && (
+            <Button size="lg" onClick={() => chooseOrg(mine.id)}>
+              До моєї компанії
+            </Button>
+          )}
+          {!denied && (
+            <Button size="lg" onClick={() => window.location.reload()}>
+              Спробувати ще раз
+            </Button>
+          )}
+          <Button size="lg" variant="outline" onClick={() => signOut().catch(() => toast.error('Не вдалося вийти'))}>
+            Вийти
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

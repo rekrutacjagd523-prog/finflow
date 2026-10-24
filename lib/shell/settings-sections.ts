@@ -1,5 +1,7 @@
 // Settings sections (S01A). Pure: used by the settings layout, the index redirect and tests.
 
+import { can, type Action, type Role } from '@/lib/shell/permissions'
+
 export type SettingsSection = 'company' | 'categories' | 'banks' | 'subscription'
 
 export const SETTINGS_SECTIONS: ReadonlyArray<{ slug: SettingsSection; label: string }> = [
@@ -46,4 +48,19 @@ export function settingsIndexRedirect(orgId: string, query: Query): string {
   const section: SettingsSection = params.has('eb_auth') || params.has('eb_error') ? 'banks' : 'company'
   const qs = params.toString()
   return qs ? `${settingsPath(orgId, section)}?${qs}` : settingsPath(orgId, section)
+}
+
+const REQUIRED_ACTION: Partial<Record<SettingsSection, Action>> = {
+  banks: 'bank.manage',
+  subscription: 'subscription.view',
+}
+
+/** Whether the role may open the section (company and categories are visible to every member). */
+export function canOpenSection(role: Role | null, section: SettingsSection): boolean {
+  const action = REQUIRED_ACTION[section]
+  return action ? can(role, action) : role !== null
+}
+
+export function visibleSettingsSections(role: Role | null): typeof SETTINGS_SECTIONS {
+  return SETTINGS_SECTIONS.filter((s) => canOpenSection(role, s.slug))
 }

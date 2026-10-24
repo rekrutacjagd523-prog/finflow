@@ -6,6 +6,7 @@ import { buildCalendar, DayData } from '@/lib/utils/analytics'
 import { ChevronLeft, ChevronRight, ChevronRight as ExpandIcon } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useShell } from '@/lib/hooks/useShell'
 import { formatCurrency } from '@/lib/utils/currency'
 import { TOKEN_COLORS } from '@/lib/ui/colors'
 
@@ -153,6 +154,7 @@ function DayRow({ day, dayNum, year, month, transactions, currency }: DayRowProp
 
 export default function CalendarView({ transactions, year, month, onNavigate, currency, loading }: CalendarViewProps) {
   const { orgSlug } = useParams<{ orgSlug: string }>()
+  const { can } = useShell()
   const days = buildCalendar(transactions, year, month)
   const totalIncome = days.reduce((s, d) => s + d.income, 0)
   const totalExpense = days.reduce((s, d) => s + d.expense, 0)
@@ -197,9 +199,11 @@ export default function CalendarView({ transactions, year, month, onNavigate, cu
       ) : days.every(d => !d.hasTransactions) ? (
         <div className="rounded-xl border border-line flex flex-col items-center justify-center gap-2 py-16">
           <p className="text-ink-muted">Немає транзакцій за цей місяць</p>
-          <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
-            Додати транзакції →
-          </Link>
+          {can('data.write') && (
+            <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground text-sm underline underline-offset-2">
+              Додати транзакції →
+            </Link>
+          )}
         </div>
       ) : (
         <div className="rounded-xl border border-line overflow-hidden bg-white">

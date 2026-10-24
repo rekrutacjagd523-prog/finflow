@@ -43,6 +43,10 @@ export async function POST(req: Request) {
     } catch (e) {
       throw toAuthHttpError(e, 'verifyIdToken')
     }
+    // Anonymous Firebase users never get a session cookie. A missing `firebase` claim is tolerated.
+    if (decoded.firebase?.sign_in_provider === 'anonymous') {
+      throw new HttpError(403, 'forbidden')
+    }
     // Written so that a missing or non-numeric auth_time (NaN) fails closed.
     const ageSeconds = Math.floor(Date.now() / 1000) - decoded.auth_time
     if (!(ageSeconds <= MAX_SIGN_IN_AGE_SECONDS)) {

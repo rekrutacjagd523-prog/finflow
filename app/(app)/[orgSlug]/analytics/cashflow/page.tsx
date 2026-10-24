@@ -10,6 +10,7 @@ import CashFlowChart from '@/components/charts/CashFlowChart'
 import { ReportToolbar } from '@/components/analytics/ReportToolbar'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useShell } from '@/lib/hooks/useShell'
 
 function formatNum(n: number): string {
   return new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 0 }).format(n)
@@ -19,6 +20,7 @@ export default function CashFlowPage() {
   const params = useParams()
   const orgSlug = params.orgSlug as string
   const orgId = orgSlug
+  const { can } = useShell()
   const { transactions, loading } = useTransactions(orgId)
   const [period, setPeriod] = useState<PeriodSelection>(DEFAULT_REPORT_PERIOD)
   // The browser clock, read once per visit (presets resolve against it).
@@ -99,9 +101,11 @@ export default function CashFlowPage() {
           ) : data.length === 0 ? (
             <div className="p-6 text-center text-sm text-ink-muted">
               Немає даних за цей період.{' '}
-              <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground underline">
-                Додати транзакції →
-              </Link>
+              {can('data.write') && (
+                <Link href={`/${orgSlug}/transactions`} className="text-brand-soft-foreground underline">
+                  Додати транзакції →
+                </Link>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">

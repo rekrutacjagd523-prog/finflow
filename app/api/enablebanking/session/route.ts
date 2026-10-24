@@ -1,5 +1,5 @@
 import { createJwt } from '@/lib/enablebanking/jwt'
-import { requireOrgMember, requireVerifiedUser } from '@/lib/server/auth'
+import { requireOrgRole, requireVerifiedUser } from '@/lib/server/auth'
 import { signEbState } from '@/lib/server/eb-state'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 
@@ -11,6 +11,7 @@ const COUNTRY_RE = /^[A-Z]{2}$/
 
 // POST /api/enablebanking/session  { aspspName, aspspCountry?, orgId }
 // Requires the session cookie of a user with a verified email who is a member of `orgId`.
+// Bank connections are owner-only.
 export async function POST(req: Request) {
   try {
     const { uid } = await requireVerifiedUser(req)
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
       throw new HttpError(400, 'invalid country')
     }
 
-    await requireOrgMember(uid, orgId)
+    await requireOrgRole(uid, orgId, ['owner'])
 
     // In production the redirect URL must come from config, never from the (spoofable) request origin.
     const configuredUrl = process.env.NEXT_PUBLIC_APP_URL

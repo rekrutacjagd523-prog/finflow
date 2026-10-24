@@ -13,14 +13,25 @@ import {
 import { usePathname, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { LazyAccountForm, LazyTransactionForm } from '@/components/forms/lazy'
+import { getMembership } from '@/lib/firebase/members'
 import { useAccounts } from '@/lib/hooks/useAccounts'
+import { useAuth } from '@/lib/hooks/useAuth'
 import { useCategories } from '@/lib/hooks/useCategories'
 import { useOrg } from '@/lib/hooks/useOrg'
+import { isValidOrgId } from '@/lib/shell/org-id'
+import { can as canRole, type Action, type Role } from '@/lib/shell/permissions'
 import { browserLocalStorage, createCollapsedStore } from '@/lib/shell/sidebar-store'
 import { effectiveSelection } from '@/lib/utils/accounts'
 import type { Account, Category, Organization, Transaction } from '@/types'
 
 export type TransactionType = Transaction['type']
+
+/** What the shell knows about the caller's access to the URL's company. */
+export type Access =
+  | { status: 'loading' }
+  | { status: 'granted'; role: Role }
+  | { status: 'denied' } // no membership document: not a member
+  | { status: 'error' } // the membership could not be read (network, outage)
 
 export interface ShellContextValue {
   /** The org id from the URL (`/[orgSlug]/...`). */
@@ -29,6 +40,12 @@ export interface ShellContextValue {
   org: Organization | null
   /** Switch to another company: navigates to its journal and loads it (the switcher uses this). */
   chooseOrg: (orgId: string) => void
+  /** The caller's access to the URL's company (read from their own membership document). */
+  access: Access
+  /** The caller's role, null until access is granted. */
+  role: Role | null
+  /** Whether the caller's role allows the action. False while access is not granted. */
+  can: (action: Action) => boolean
   accounts: Account[]
   accountsLoading: boolean
   incomeCategories: Category[]
@@ -56,10 +73,53 @@ const sidebarStore = createCollapsedStore(browserLocalStorage)
 export function ShellProvider({ orgId, children }: { orgId: string; children: ReactNode }) {
   const router = useRouter()
   const { org: loadedOrg, switchOrg } = useOrg()
+  const { user } = useAuth()
+  const uid = user?.uid ?? null
+  // The id comes from the URL: a malformed one is "denied" without any Firestore call.
+  const orgIdValid = isValidOrgId(orgId)
+
+  // One membership read per (company, user). The result carries its key, so a result for the previous
+  // company is never mistaken for the current one while a new read is in flight (no setState in the
+  // effect body: the state is set from the promise callbacks only).
+  const accessKey = uid && orgIdValid ? `${orgId}:${uid}` : null
+  const [accessResult, setAccessResult] = useState<
+    { key: string; role: Role | null } | { key: string; failed: true } | null
+  >(null)
+  useEffect(() => {
+    if (!accessKey || !uid) return
+    let cancelled = false
+    getMembership(orgId, uid).then(
+      (role) => {
+        if (!cancelled) setAccessResult({ key: accessKey, role })
+      },
+      () => {
+        if (!cancelled) setAccessResult({ key: accessKey, failed: true })
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [accessKey, orgId, uid])
+
+  const access: Access = !orgIdValid
+    ? { status: 'denied' }
+    : !accessKey || accessResult?.key !== accessKey
+      ? { status: 'loading' }
+      : 'failed' in accessResult
+        ? { status: 'error' }
+        : accessResult.role
+          ? { status: 'granted', role: accessResult.role }
+          : { status: 'denied' }
+  const role = access.status === 'granted' ? access.role : null
+  const dataOrgId = access.status === 'granted' ? orgId : null
+
   // The only accounts/categories subscription of the shell: pages read these from the context
-  // (a second useCategories on a fresh org would seed the default categories twice).
-  const { accounts, loading: accountsLoading } = useAccounts(orgId)
-  const { incomeCategories, expenseCategories, loading: categoriesLoading } = useCategories(orgId)
+  // (a second useCategories on a fresh org would seed the default categories twice). They start only
+  // once access is granted, so a foreign URL never attaches listeners or seeds default categories.
+  const { accounts, loading: accountsLoading } = useAccounts(dataOrgId)
+  const { incomeCategories, expenseCategories, loading: categoriesLoading } = useCategories(dataOrgId, {
+    seed: canRole(role, 'data.write'),
+  })
 
   // A selection belongs to one org: it is ignored as soon as the URL points at another one.
   const [selection, setSelection] = useState<{ orgId: string; accountId: string | null }>({
@@ -102,10 +162,10 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
       if (chosenOrgId.current === orgId) chosenOrgId.current = null
       else return
     }
-    if (!loadedOrg || loadedOrg.id === orgId || requestedOrgId.current === orgId) return
+    if (!orgIdValid || !loadedOrg || loadedOrg.id === orgId || requestedOrgId.current === orgId) return
     requestedOrgId.current = orgId
     switchOrg(orgId).catch(() => toast.error('Не вдалося переключити компанію'))
-  }, [loadedOrg, orgId, switchOrg])
+  }, [loadedOrg, orgId, orgIdValid, switchOrg])
 
   const chooseOrg = (id: string) => {
     if (id === orgId) return
@@ -122,11 +182,14 @@ export function ShellProvider({ orgId, children }: { orgId: string; children: Re
     orgId,
     org: loadedOrg && loadedOrg.id === orgId ? loadedOrg : null,
     chooseOrg,
+    access,
+    role,
+    can: (action) => canRole(role, action),
     accounts,
-    accountsLoading,
+    accountsLoading: access.status !== 'granted' || accountsLoading,
     incomeCategories,
     expenseCategories,
-    categoriesLoading,
+    categoriesLoading: access.status !== 'granted' || categoriesLoading,
     selectedAccountId,
     selectAccount: (accountId) => setSelection({ orgId, accountId }),
     openTransactionForm: (type) => setTransactionFormType(type),

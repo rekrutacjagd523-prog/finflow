@@ -8,6 +8,7 @@ import { doc, setDoc, terminate, type Firestore } from 'firebase/firestore'
 // through the NEXT_PUBLIC_USE_EMULATORS=1 wiring, as a signed-out browser would.
 let testEnv: RulesTestEnvironment
 let client: typeof import('@/lib/firebase/firestore')
+let members: typeof import('@/lib/firebase/members')
 let clientDb: Firestore
 
 beforeAll(async () => {
@@ -22,12 +23,12 @@ beforeAll(async () => {
       currency: 'UAH',
       ownerId: 'bob',
       plan: 'trial',
-      members: { bob: { role: 'owner' } },
     })
   })
   vi.stubEnv('NEXT_PUBLIC_USE_EMULATORS', '1')
   vi.stubEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'demo-finflow')
   client = await import('@/lib/firebase/firestore')
+  members = await import('@/lib/firebase/members')
   clientDb = (await import('@/lib/firebase/firebase')).db
 })
 
@@ -38,8 +39,8 @@ afterAll(async () => {
 })
 
 describe('client SDK against the emulator (signed out)', () => {
-  it('reaches the emulator: listing orgs is rejected by the rules', async () => {
-    await expect(client.getUserOrganizations('bob')).rejects.toMatchObject({ code: 'permission-denied' })
+  it('reaches the emulator: the memberships query is rejected for a signed-out caller', async () => {
+    await expect(members.getMemberships('bob')).rejects.toMatchObject({ code: 'permission-denied' })
   })
 
   it('getOrganization returns null for an org the caller may not read', async () => {

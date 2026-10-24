@@ -24,7 +24,8 @@ export default function CompanySettingsPage() {
   const params = useParams()
   const orgId = params.orgSlug as string
   // The shell's org is always the URL's org; switchOrg only refreshes it after a save.
-  const { org } = useShell()
+  const { org, can } = useShell()
+  const canEdit = can('company.edit')
   const { switchOrg } = useOrg()
 
   const [name, setName] = useState('')
@@ -38,12 +39,15 @@ export default function CompanySettingsPage() {
     }
   }, [org])
 
+  // The name is saved trimmed (the rules also refuse a blank one); a blank name is not a valid change.
+  const trimmedName = name.trim()
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!orgId || !name) return
+    if (!canEdit || !orgId || trimmedName.length === 0) return
     setSaving(true)
     try {
-      await updateDoc(doc(db, 'organizations', orgId), { name, currency })
+      await updateDoc(doc(db, 'organizations', orgId), { name: trimmedName, currency })
     } catch {
       toast.error('Помилка збереження')
       setSaving(false)
@@ -60,7 +64,7 @@ export default function CompanySettingsPage() {
     setSaving(false)
   }
 
-  const isChanged = org && (name !== org.name || currency !== org.currency)
+  const isChanged = org && trimmedName.length > 0 && (trimmedName !== org.name || currency !== org.currency)
 
   return (
     <Card className="ring-line">
@@ -78,6 +82,8 @@ export default function CompanySettingsPage() {
               onChange={(e) => setName(e.target.value)}
               className="h-9 rounded-control border-line bg-surface"
               required
+              maxLength={120}
+              disabled={!canEdit}
             />
           </div>
           <div className="space-y-1.5">
@@ -88,15 +94,20 @@ export default function CompanySettingsPage() {
               onChange={(e) => setCurrency(e.target.value)}
               wrapperClassName="flex w-full"
               className="border-line"
+              disabled={!canEdit}
             >
               {CURRENCIES.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </NativeSelect>
           </div>
-          <Button type="submit" size="lg" disabled={!isChanged || saving}>
-            {saving ? 'Збереження...' : 'Зберегти'}
-          </Button>
+          {canEdit ? (
+            <Button type="submit" size="lg" disabled={!isChanged || saving}>
+              {saving ? 'Збереження...' : 'Зберегти'}
+            </Button>
+          ) : (
+            <p className="text-xs text-ink-muted">Змінювати дані компанії може лише власник.</p>
+          )}
         </form>
       </CardContent>
     </Card>

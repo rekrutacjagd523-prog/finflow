@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   SETTINGS_SECTIONS,
   activeSettingsSection,
+  canOpenSection,
   isSettingsPath,
   settingsIndexRedirect,
   settingsPath,
+  visibleSettingsSections,
 } from '@/lib/shell/settings-sections'
 
 describe('isSettingsPath', () => {
@@ -92,5 +94,30 @@ describe('settingsIndexRedirect', () => {
 
   it('encodes the org id', () => {
     expect(settingsIndexRedirect('a/b', {})).toBe('/a%2Fb/settings/company')
+  })
+})
+
+describe('role-aware settings sections', () => {
+  const slugs = (role: Parameters<typeof visibleSettingsSections>[0]) => visibleSettingsSections(role).map((s) => s.slug)
+
+  it('owner sees everything', () => {
+    expect(slugs('owner')).toEqual(['company', 'categories', 'banks', 'subscription'])
+  })
+
+  it('accountant and viewer do not see banks and subscription', () => {
+    expect(slugs('accountant')).toEqual(['company', 'categories'])
+    expect(slugs('viewer')).toEqual(['company', 'categories'])
+  })
+
+  it('without a role nothing opens', () => {
+    expect(slugs(null)).toEqual([])
+    expect(canOpenSection(null, 'company')).toBe(false)
+  })
+
+  it('canOpenSection matches the list', () => {
+    expect(canOpenSection('owner', 'banks')).toBe(true)
+    expect(canOpenSection('accountant', 'banks')).toBe(false)
+    expect(canOpenSection('viewer', 'subscription')).toBe(false)
+    expect(canOpenSection('viewer', 'categories')).toBe(true)
   })
 })

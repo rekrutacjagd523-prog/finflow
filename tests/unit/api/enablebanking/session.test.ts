@@ -107,6 +107,16 @@ describe('POST /api/enablebanking/session', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['accountant', 'token-carol'],
+    ['viewer', 'token-dave'],
+  ])('returns 403 for a %s (bank connections are owner-only)', async (_role, token) => {
+    const res = await POST(sessionRequest(VALID_BODY, token))
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('returns 403 when the org does not exist', async () => {
     const res = await POST(sessionRequest({ ...VALID_BODY, orgId: 'org-ghost' }, 'token-alice'))
     expect(res.status).toBe(403)

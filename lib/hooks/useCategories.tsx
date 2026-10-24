@@ -11,31 +11,43 @@ interface UseCategoriesResult {
   error: string | null
 }
 
-export function useCategories(orgId: string | null): UseCategoriesResult {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+const EMPTY_CATEGORIES: Category[] = []
+
+interface UseCategoriesOptions {
+  /**
+   * Create the default categories when the company has none. Only a caller who may write data can
+   * (the rules refuse everyone else), so a viewer passes false and never even tries.
+   */
+  seed?: boolean
+}
+
+export function useCategories(orgId: string | null, { seed = true }: UseCategoriesOptions = {}): UseCategoriesResult {
+  // The data is stored with the company it belongs to, so a company switch never shows the
+  // previous company's categories while the new subscription waits for its first snapshot.
+  const [snapshot, setSnapshot] = useState<{ orgId: string; categories: Category[] } | null>(null)
+  const [error] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!orgId) {
-      setLoading(false)
-      return
-    }
-    setLoading(true)
+    if (!orgId) return
 
     // Seed defaults on first load
-    seedDefaultCategories(orgId).catch(() => {
-      // silently ignore if already seeded
-    })
+    if (seed) {
+      seedDefaultCategories(orgId).catch(() => {
+        // silently ignore if already seeded
+      })
+    }
 
     const unsub = getCategories(orgId, (data) => {
-      setCategories(data)
-      setLoading(false)
+      setSnapshot({ orgId, categories: data })
     })
     return () => {
       unsub()
     }
-  }, [orgId])
+  }, [orgId, seed])
+
+  const current = orgId !== null && snapshot?.orgId === orgId
+  const loading = orgId !== null && !current
+  const categories = current ? snapshot.categories : EMPTY_CATEGORIES
 
   const incomeCategories = categories.filter((c) => c.type === 'income')
   const expenseCategories = categories.filter((c) => c.type === 'expense')

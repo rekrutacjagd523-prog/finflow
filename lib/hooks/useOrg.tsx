@@ -9,7 +9,8 @@ import React, {
   type ReactNode,
 } from 'react'
 import { auth } from '@/lib/firebase/firebase'
-import { getOrganization, getUserOrganizations } from '@/lib/firebase/firestore'
+import { getOrganization } from '@/lib/firebase/firestore'
+import { getMyOrganizations } from '@/lib/firebase/members'
 import { useAuth } from './useAuth'
 import type { Organization } from '@/types'
 
@@ -58,7 +59,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
         }
 
         // Fallback: load first org
-        const orgs = await getUserOrganizations(user.uid)
+        const orgs = await getMyOrganizations(user.uid)
         if (seq !== loadSeq.current) return
         if (orgs.length > 0) {
           setOrg(orgs[0])

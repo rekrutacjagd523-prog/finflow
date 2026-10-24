@@ -1,5 +1,5 @@
 import { createJwt } from '@/lib/enablebanking/jwt'
-import { requireOrgMember, requireUser } from '@/lib/server/auth'
+import { requireOrgRole, requireUser } from '@/lib/server/auth'
 import { verifyEbState } from '@/lib/server/eb-state'
 import { errorResponse, HttpError } from '@/lib/server/http-error'
 
@@ -23,6 +23,7 @@ function redirectTo(req: Request, path: string): Response {
 // /api/enablebanking/session is verified first (forgeries get 400 and nothing else is touched),
 // then the session must belong to the same user as the state, then membership is checked.
 // All of that happens BEFORE the code is exchanged.
+// Bank connections are owner-only.
 export async function GET(req: Request) {
   const params = new URL(req.url).searchParams
   const code = params.get('code')
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
   try {
     const { uid } = await requireUser(req)
     if (uid !== verified.uid) throw new HttpError(403, 'forbidden')
-    await requireOrgMember(verified.uid, verified.orgId)
+    await requireOrgRole(verified.uid, verified.orgId, ['owner'])
   } catch (e) {
     // The session ended (or never existed) while the user was at the bank: sign in again and
     // come back to settings. The one-time code is dropped; the user restarts the connection.
