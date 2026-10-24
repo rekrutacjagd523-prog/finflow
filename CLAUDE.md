@@ -65,6 +65,7 @@ app/
     transactions/  analytics/{cashflow,pl,balance,calendar}/  settings/{company,categories,banks,subscription}/ (layout.tsx = section menu; settings/ redirects)
   api/health/route.ts             ← health check (firebase-admin)
   api/auth/{session,logout}/route.ts  ← mint / revoke the session cookie
+  api/orgs/route.ts               ← POST: create a company + owner membership (S02)
   api/enablebanking/{institutions,session,callback,accounts}/route.ts
   page.tsx (landing), pricing/, layout.tsx, globals.css, robots.ts, sitemap.ts
 components/
@@ -80,7 +81,7 @@ lib/
   enablebanking/ ← jwt.ts (server-only), client.ts (ebFetch)
   shell/         ← pure shell helpers: modules.ts (tabs), settings-sections.ts, sidebar-store.ts
   utils/         ← accounts (summarizeAccounts), analytics, currency, date, export (CSV), journal (day totals, UTC dates), period + calendar-grid (report periods, UTC)
-scripts/         ← check-server-imports.mjs (CI guard), vercel.mjs (Vercel API helper), verify-firestore-rules.mjs (black-box rules check)
+scripts/         ← check-server-imports.mjs (CI guard), vercel.mjs (Vercel API helper), verify-firestore-rules.mjs (black-box rules check), migrate-memberships.mjs (S02 migration)
 types/           ← shared TS types (Organization, Account, Transaction, …)
 tests/
   unit/          ← Vitest
@@ -92,11 +93,26 @@ vercel.json  .github/workflows/ci.yml  .env.example  AGENTS.md (managed by next 
 docs/            ← research, specs, plans
 ```
 
-## Firestore Data Model (S00)
-- `organizations/{orgId}`: `{ name, currency, ownerId, plan, trialEndsAt, createdAt, members: { [uid]: { role: 'owner' } } }`
+## Firestore Data Model (S00, S02)
+- `organizations/{orgId}`: `{ name, currency, ownerId, plan, trialEndsAt, createdAt }` (no `members` map since S02; `ownerId` is informational, access is decided by the membership document)
+  - `members/{uid}`: `{ uid, role: 'owner' | 'accountant' | 'viewer', createdAt, addedBy }` (`uid` repeats the document id: the collection-group query filters on it)
   - subcollections: `accounts`, `categories`, `transactions`, `bankConnections`
 - `_meta/{docId}` — server-only (for example `_meta/health`); clients are denied by the rules
-- Membership lookup on the client: `where('members.<uid>.role', '!=', null)` in `useOrg`. S02 moves membership into its own documents.
+- Membership lookup on the client (`lib/firebase/members.ts`): `getMemberships(uid)` is a collection-group query `collectionGroup('members').where('uid', '==', uid)` (the rules are not a filter, so the query must constrain `uid` to the caller's own uid); `getMyOrganizations(uid)` loads the organizations of those memberships by id (organizations cannot be listed); `getMembership(orgId, uid)` reads the caller's own member document (its role, or null = no access). The collection-group index is in `firestore.indexes.json` (`fieldOverrides` for `members.uid`).
+
+### Roles and tenancy (S02)
+| Role | Data (`accounts`, `categories`, `transactions`) | Banks (`bankConnections`, Enable Banking) | Company name/currency | Subscription page |
+|---|---|---|---|---|
+| `owner` | read, write | read, write | edit | yes |
+| `accountant` | read, write | no | read only | no |
+| `viewer` | read only | no | read only | no |
+
+- `can(role, action)` in `lib/shell/permissions.ts` (pure, shared by browser and server; actions `data.write`, `bank.manage`, `company.edit`, `subscription.view`). The role-aware UI is a convenience; the protection is `firestore.rules` (`hasRole(orgId, roles)`) and `requireOrgRole`.
+- Clients never create or delete organizations or memberships and never change `ownerId`, `plan`, `trialEndsAt` or `createdAt`; only the server writes them (`POST /api/orgs`, the migration script). An owner may update only `name` and `currency`.
+- Companies are created only by `POST /api/orgs` (`lib/server/orgs.ts`): a transaction creates the organization and the owner membership together; a user may own at most 3 companies (409 `org_limit_reached`).
+- The collection name `members` is reserved for memberships: the collection-group rule in `firestore.rules` applies to every collection with that name. Never use it for anything else.
+- A new subcollection under `organizations/{orgId}` is closed until it is added to the lists in `firestore.rules` (read and write roles) and to the matrix in `tests/rules/firestore.rules.test.ts`.
+- Migration of the legacy `members` map: `node scripts/migrate-memberships.mjs` (dry run), `--apply` (creates missing membership documents, idempotent), `--drop-members-map` (removes the legacy field, only after verification in production). With `FIRESTORE_EMULATOR_HOST` set it targets the emulator and uses no credentials. Rollout order is in the S02 spec.
 
 ## Coding Conventions
 - TypeScript strict mode always
@@ -104,8 +120,8 @@ docs/            ← research, specs, plans
 - Next 16: `params`, `searchParams`, `cookies()`, `headers()` are async — always `await` them (or React `use()` in client components)
 - Client Firebase calls only in `/lib/firebase/` and `/lib/hooks/` (legacy exception: `app/(app)/[orgSlug]/settings/company/page.tsx` and `settings/categories/page.tsx` still call `updateDoc`/`deleteDoc` directly)
 - Server-side Firestore/Auth only through `getAdmin()` from `lib/server/`; route handlers that use it `export const runtime = 'nodejs'`; map errors with `HttpError` + `errorResponse()`
-- Browser → API calls that need a user rely on the `__session` cookie (`ebFetch`, same-origin); the route calls `requireUser()` / `requireVerifiedUser()` and then `requireOrgMember()`
-- Enable Banking OAuth `state` is HMAC-signed (`lib/server/eb-state.ts`, 15 min) and carries uid + orgId; the callback verifies it, requires the session uid to equal the state uid, and re-checks membership. The bank connection (`/api/enablebanking/session`) needs a verified email (`requireVerifiedUser`, 403 `email_not_verified`); verification is soft everywhere else
+- Browser → API calls that need a user rely on the `__session` cookie (`ebFetch`, same-origin); the route calls `requireUser()` / `requireVerifiedUser()` and then `requireOrgRole(uid, orgId, [...roles])` (reads `organizations/{orgId}/members/{uid}`; no membership, an unknown role or a role outside the list all give the same 403 `forbidden`; returns the role). The Enable Banking routes (`session`, `accounts`, `callback`) use `requireOrgRole(uid, orgId, ['owner'])`
+- Enable Banking OAuth `state` is HMAC-signed (`lib/server/eb-state.ts`, 15 min) and carries uid + orgId; the callback verifies it, requires the session uid to equal the state uid, and re-checks the owner role. The bank connection (`/api/enablebanking/session`) needs a verified email (`requireVerifiedUser`, 403 `email_not_verified`); verification is soft everywhere else
 - `cn()` from `lib/utils` for className merging
 - All dates: `Date` objects in code, Firestore `Timestamp` in DB
 - Currency formatting: `Intl.NumberFormat` via `formatCurrency(amount, currency)`
@@ -167,6 +183,6 @@ docs/            ← research, specs, plans
 - `import 'server-only'` in `lib/server/*` and `firebase-admin` imports outside `lib/server/` — client code must never pull in the Admin SDK
 
 ## Freemium / Trial Logic
-- Today: registration (`lib/firebase/firestore.ts`) stores `plan: 'trial'` and `trialEndsAt` = now + 14 days on the organization; nothing enforces the trial yet
-- Clients cannot change `plan`, `trialEndsAt`, `ownerId` or `members` (`firestore.rules`)
+- Today: registration creates the company through `POST /api/orgs` (`lib/firebase/orgs-client.ts`), which stores `plan: 'trial'` and `trialEndsAt` = now + 14 days on the organization; nothing enforces the trial yet
+- Clients never create/delete organizations or memberships and cannot change `plan`, `trialEndsAt` or `ownerId` (`firestore.rules`); only the server writes them
 - Planned (S17): Stripe billing in PLN, read-only after the trial, `/pricing` redirect
