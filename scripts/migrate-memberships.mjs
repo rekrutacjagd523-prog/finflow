@@ -8,6 +8,20 @@
 //                                                              membership document is verified (run AFTER the
 //                                                              rollout, see the S02 spec)
 //
+// Membership documents are created with create(), never set(): an existing membership document is never overwritten
+// (a role that differs from the legacy map is reported as a conflict and left untouched).
+//
+// Production guards (a run WITHOUT FIRESTORE_EMULATOR_HOST targets production; the emulator is never restricted):
+//   dry run                    needs no flag.
+//   --apply                    needs --project=finflow-e94b5, otherwise it refuses with exit code 2.
+//   --drop-members-map         needs --project=finflow-e94b5 AND --rules-deployed (your statement that the S02 app is
+//                              deployed and the new firestore.rules are live: with the old rules or the old app the
+//                              dropped field would lock every member out); otherwise exit code 2.
+//                              It also refuses (exit code 1, org and uid listed) while the plan skips members with
+//                              reason invalid_role or invalid_uid, because the drop would erase the only record of them;
+//                              --allow-skipped accepts that.
+//   The flag check runs before credentials are read or anything is contacted.
+//
 // Credentials (never printed): GOOGLE_APPLICATION_CREDENTIALS, else the service-account JSON in .secrets/
 // (finflow-*-firebase-adminsdk-*.json). Nothing from document contents is printed, only counters and ids.
 //
@@ -17,6 +31,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { assertDropSkippedAllowed, assertProductionFlags } from './lib/migration-guard.mjs'
 import { planMemberships } from './lib/plan-memberships.mjs'
 
 const PROJECT_ID = 'finflow-e94b5'
@@ -29,6 +44,13 @@ const CHUNK = 400
 if (APPLY && DROP) {
   console.error('Use --apply and --drop-members-map in separate runs.')
   process.exit(2)
+}
+
+// Before credentials are read or anything is contacted.
+const flagCheck = assertProductionFlags({ emulator: !!process.env.FIRESTORE_EMULATOR_HOST, apply: APPLY, drop: DROP, args })
+if (!flagCheck.ok) {
+  console.error(flagCheck.message)
+  process.exit(flagCheck.exitCode)
 }
 
 function credential() {
@@ -81,6 +103,13 @@ for (const s of plan.skipped) console.log(`  skipped org=${s.orgId} uid=${s.uid 
 for (const c of conflicts) console.log(`  conflict org=${c.orgId} uid=${c.uid}`)
 
 if (DROP) {
+  // Safety: members that could not become membership documents would lose their only record.
+  const skippedCheck = assertDropSkippedAllowed({ args, skipped: plan.skipped })
+  if (!skippedCheck.ok) {
+    console.error(skippedCheck.message)
+    for (const s of skippedCheck.ids) console.error(`  org=${s.orgId} uid=${s.uid ?? '-'} reason=${s.reason}`)
+    process.exit(skippedCheck.exitCode)
+  }
   // Safety: refuse unless every membership implied by a legacy map exists with the planned role.
   const missing = plan.writes.filter((w) => existing.get(`${w.orgId}/${w.uid}`) !== w.role)
   if (missing.length > 0) {
