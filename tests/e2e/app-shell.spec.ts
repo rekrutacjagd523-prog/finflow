@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { registerViaUi, waitForShell } from './helpers/app-ui'
 import { signInEmulatorUser } from './helpers/emulator-auth'
-import { seedDoc } from './helpers/emulator-firestore'
+import { seedDoc, seedMember } from './helpers/emulator-firestore'
 import { formatDayLongUtc } from '../../lib/utils/calendar-grid'
 import { formatPeriodLabel } from '../../lib/utils/period'
 
@@ -314,8 +314,8 @@ test.describe('app shell (emulators)', () => {
       plan: 'trial',
       trialEndsAt: new Date(Date.now() + 14 * DAY_MS),
       createdAt: new Date(),
-      members: { [uid]: { role: 'owner' } },
     })
+    await seedMember(request, orgBId, uid, 'owner')
 
     // Record every company name the header shows ('' while it shows the loading placeholder), so
     // a switch that bounces back to the previous company (the flicker chooseOrg prevents) is caught.
