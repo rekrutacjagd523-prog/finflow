@@ -28,7 +28,7 @@ test.describe('smoke on emulators', () => {
 
   test('Enable Banking session from a verified non-member -> 403 (criterion 4)', async ({ request }) => {
     // A real Auth-emulator user with a verified email who belongs to no organization. The route
-    // runs requireVerifiedUser and requireOrgMember before createJwt, so it answers 403 without
+    // runs requireVerifiedUser and requireOrgRole (owner only) before createJwt, so it answers 403 without
     // calling Enable Banking.
     const user = await createEmulatorUser(request, { verified: true })
     const mint = await request.post('/api/auth/session', {

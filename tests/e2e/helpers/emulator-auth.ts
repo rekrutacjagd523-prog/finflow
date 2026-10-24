@@ -3,6 +3,9 @@ import type { APIRequestContext } from '@playwright/test'
 const API_KEY = 'demo-api-key'
 const PROJECT = 'demo-finflow'
 
+/** The password of every user createEmulatorUser creates. */
+export const EMULATOR_USER_PASSWORD = 'e2e-pass-123456'
+
 function emulatorHost(): string {
   const host = process.env.FIREBASE_AUTH_EMULATOR_HOST
   if (!host) throw new Error('FIREBASE_AUTH_EMULATOR_HOST is not set (run inside firebase emulators:exec)')
@@ -40,7 +43,7 @@ export async function createEmulatorUser(
 ): Promise<{ email: string; idToken: string }> {
   const email = `e2e-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}@finflow.test`
   const signUp = await request.post(identityToolkit('accounts:signUp'), {
-    data: { email, password: 'e2e-pass-123456', returnSecureToken: true },
+    data: { email, password: EMULATOR_USER_PASSWORD, returnSecureToken: true },
   })
   await ok(signUp, 'signUp')
   const { idToken } = (await signUp.json()) as { idToken: string }
