@@ -132,4 +132,26 @@ describe('POST /api/orgs', () => {
     const big = JSON.stringify({ name: 'x'.repeat(5000), currency: 'PLN' })
     expect((await POST(createRequest(big, { token: MALLORY }))).status).toBe(413)
   })
+
+  it('answers 413 for a declared Content-Length over the limit before reading the body', async () => {
+    const orgs = fakeOrgs.size
+    const req = new Request('http://localhost:3000/api/orgs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://localhost:3000',
+        Cookie: `__session=${MALLORY}`,
+        'content-length': '999999',
+      },
+      body: JSON.stringify(VALID),
+    })
+    const textSpy = vi.spyOn(req, 'text')
+
+    const res = await POST(req)
+
+    expect(res.status).toBe(413)
+    expect(await res.json()).toEqual({ error: 'payload too large' })
+    expect(textSpy).not.toHaveBeenCalled()
+    expect(fakeOrgs.size).toBe(orgs)
+  })
 })

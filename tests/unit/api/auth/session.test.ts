@@ -75,6 +75,21 @@ describe('POST /api/auth/session', () => {
     expect(fakeAdmin.auth.createSessionCookie).not.toHaveBeenCalled()
   })
 
+  it('refuses an anonymous Firebase user with 403 and mints nothing', async () => {
+    fakeAdmin.auth.verifyIdToken.mockResolvedValueOnce({
+      uid: 'user-alice',
+      auth_time: Math.floor(Date.now() / 1000),
+      firebase: { sign_in_provider: 'anonymous' },
+    } as never)
+
+    const res = await POST(mintRequest({ idToken: 'token-alice' }))
+
+    expect(res.status).toBe(403)
+    expect(await res.json()).toEqual({ error: 'forbidden' })
+    expect(res.headers.get('set-cookie')).toBeNull()
+    expect(fakeAdmin.auth.createSessionCookie).not.toHaveBeenCalled()
+  })
+
   it('returns 413 for a declared body larger than 8 KiB before touching Firebase', async () => {
     const req = mintRequest({ idToken: 'token-alice' })
     req.headers.set('Content-Length', '9000')

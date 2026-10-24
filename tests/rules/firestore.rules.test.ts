@@ -160,7 +160,28 @@ describe('organization document', () => {
   it('a non-member, an unknown role and an anonymous user cannot get it', async () => {
     await assertFails(getDoc(doc(as('erin'), 'organizations/orgA')))
     await assertFails(getDoc(doc(as('frank'), 'organizations/orgA')))
+    await assertFails(getDoc(doc(anon(), 'organizations/orgA')))
+  })
+
+  it('a member of another org only (bob) cannot get it', async () => {
     await assertFails(getDoc(doc(as('bob'), 'organizations/orgA')))
+  })
+
+  it.each([
+    ['a list', ['owner']],
+    ['a map', { role: 'owner' }],
+    ['null', null],
+    ['a missing field', undefined],
+    ['the wrong case', 'Owner'],
+  ])('a membership whose role is %s grants nothing', async (_label, role) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const data: Record<string, unknown> = { uid: 'mallory', createdAt: Timestamp.now(), addedBy: 'alice' }
+      if (role !== undefined) data.role = role
+      await setDoc(doc(fs(ctx), 'organizations/orgA/members/mallory'), data)
+    })
+
+    await assertFails(getDoc(doc(as('mallory'), 'organizations/orgA')))
+    await assertFails(setDoc(doc(as('mallory'), 'organizations/orgA/accounts/x'), { orgId: 'orgA', name: 'x' }))
   })
 
   it('a missing organization cannot be read', async () => {
@@ -181,6 +202,10 @@ describe('organization document', () => {
     await assertSucceeds(updateDoc(doc(as('alice'), 'organizations/orgA'), { name: 'New', currency: 'EUR' }))
   })
 
+  it.each(['PLN', 'EUR', 'USD', 'UAH'])('the owner can set the currency %s', async (currency) => {
+    await assertSucceeds(updateDoc(doc(as('alice'), 'organizations/orgA'), { currency }))
+  })
+
   it.each(['carol', 'dave', 'frank', 'erin', 'bob'])('%s cannot update it', async (uid) => {
     await assertFails(updateDoc(doc(as(uid), 'organizations/orgA'), { name: 'pwned' }))
   })
@@ -199,6 +224,10 @@ describe('organization document', () => {
     ['an empty name', { name: '' }],
     ['a non-string name', { name: 123 }],
     ['a 4 letter currency', { currency: 'EURO' }],
+    ['the currency $$$', { currency: '$$$' }],
+    ['the unsupported currency GBP', { currency: 'GBP' }],
+    ['a lowercase currency', { currency: 'pln' }],
+    ['a name of only spaces', { name: '   ' }],
   ])('even the owner cannot update with %s', async (_label, data) => {
     await assertFails(updateDoc(doc(as('alice'), 'organizations/orgA'), data))
   })

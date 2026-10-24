@@ -36,8 +36,8 @@ service cloud.firestore {
 
     // Type and size checks for the fields the owner may edit.
     function orgFieldsValid(o) {
-      return o.name is string && o.name.size() > 0 && o.name.size() <= 120
-        && o.currency is string && o.currency.size() == 3;
+      return o.name is string && o.name.trim().size() > 0 && o.name.size() <= 120
+        && o.currency is string && o.currency in ['PLN', 'EUR', 'USD', 'UAH'];
     }
 
     // A subcollection document may carry an `orgId`, but only its own org's.
